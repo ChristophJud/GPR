@@ -43,7 +43,7 @@ private:
 };
 
 /*
- * Gaussian Kernel: k(x,y) = exp( -||x-y||^2 / sigma^2 )
+ * Gaussian Kernel: k(x,y) = exp( -0.5||x-y||^2 / sigma^2 )
  */
 template <class TScalarType>
 class GaussianKernel : public Kernel<TScalarType>{
@@ -77,6 +77,58 @@ private:
     TScalarType m_Scale;
 	
 	GaussianKernel(const Self&); //purposely not implemented
+    void operator=(const Self&); //purposely not implemented
+};
+
+
+/*
+ * Periodic Kernel: k(x,y) = alpha^2 exp( -0.5 sum_d=1^D sin(b(x_d-y_d))/sigma_d)^2 )
+ *
+ * - D is the number of input dimensions
+ */
+template <class TScalarType>
+class PeriodicKernel : public Kernel<TScalarType>{
+public:
+
+    typedef Kernel<TScalarType> Superclass;
+    typedef PeriodicKernel Self;
+    typedef typename Superclass::VectorType VectorType;
+    typedef typename Superclass::ParameterVectorType ParameterVectorType;
+
+    virtual inline TScalarType operator()(const VectorType & x, const VectorType & y){
+        TScalarType sum = 0;
+        for(unsigned i=0; i<x.rows(); i++){
+            double f = std::sin(m_B*(x[i] - y[i]))/m_Sigma;
+            sum += f*f;
+        }
+
+        return m_Alpha_Squared * std::exp(-0.5*sum);
+    }
+
+    PeriodicKernel(TScalarType alpha,
+                   TScalarType b,
+                   TScalarType sigma) : Superclass(),
+            m_Alpha(alpha),
+            m_B(b),
+            m_Sigma(sigma),
+            m_Alpha_Squared(alpha*alpha)
+            {
+
+        this->m_parameters.push_back(m_Alpha);
+        this->m_parameters.push_back(m_B);
+        this->m_parameters.push_back(m_Sigma);
+    }
+    virtual ~PeriodicKernel() {}
+
+    std::string ToString(){ return "PeriodicKernel"; }
+
+private:
+    TScalarType m_Alpha;
+    TScalarType m_B;
+    TScalarType m_Sigma;
+    TScalarType m_Alpha_Squared;
+
+    PeriodicKernel(const Self&); //purposely not implemented
     void operator=(const Self&); //purposely not implemented
 };
 

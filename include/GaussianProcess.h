@@ -268,6 +268,17 @@ public:
             KernelTypePointer k(new KernelType(kernel_parameters[0], kernel_parameters[1]));
             m_Kernel = k;
         }
+        else if(kernel_type.compare("PeriodicKernel")==0){
+            typedef PeriodicKernel<TScalarType>		KernelType;
+            typedef std::shared_ptr<KernelType> KernelTypePointer;
+            if(kernel_parameters.size() != 3){
+                throw std::string("GaussianProcess::Load: wrong number of kernel parameters.");
+            }
+            KernelTypePointer k(new KernelType(kernel_parameters[0],
+                                               kernel_parameters[1],
+                                               kernel_parameters[2]));
+            m_Kernel = k;
+        }
         else{
             throw std::string("GaussianProcess::Load: kernel not recognized.");
         }
