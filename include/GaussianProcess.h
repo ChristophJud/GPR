@@ -7,9 +7,8 @@
 #include <memory>
 
 #include <Eigen/Dense>
-#include <Eigen/Cholesky>
 
-#include <boost/algorithm/string/predicate.hpp>
+#define BOOST_NO_CXX11_SCOPED_ENUMS
 #include <boost/filesystem.hpp>
 namespace fs = boost::filesystem;
 
@@ -165,7 +164,7 @@ public:
 		// KernelType, KernelParameter, noise, InputDimension, OutputDimension
 		std::ofstream parameter_outfile;
 		parameter_outfile.open(std::string(prefix+"-ParameterFile.txt").c_str());
-		parameter_outfile << m_Kernel->ToString() << " " << m_Kernel->GetParameter() << " " << m_Sigma << " " << m_InputDimension << " " << m_OutputDimension;
+        parameter_outfile << m_Kernel->ToString() << " " << m_Kernel->GetParameter() << " " << m_Sigma << " " << m_InputDimension << " " << m_OutputDimension << " " << debug;
 		parameter_outfile.close();
 	}
 
@@ -230,7 +229,8 @@ public:
 					line_stream >> kernel_parameter &&
 					line_stream >> m_Sigma &&
 					line_stream >> m_InputDimension &&
-					line_stream >> m_OutputDimension)){
+                    line_stream >> m_OutputDimension &&
+                    line_stream >> debug)){
 				throw std::string("GaussianProcess::Load: parameter file is corrupt");
 			}
 		}
@@ -259,6 +259,64 @@ public:
 		std::cout << "       - Parameter:\t" << m_Kernel->GetParameter() << std::endl;
 		std::cout << "---------------------------------------" << std::endl;
 	}
+
+    bool operator ==(const GaussianProcess<TScalarType> &b) const{
+        if(this->debug) std::cout << "GaussianProcess::comparison: " << std::flush;
+
+        if((this->m_RegressionVectors - b.m_RegressionVectors).norm() > 0){
+            if(this->debug) std::cout << "regression vectors not equal." << std::endl;
+            return false;
+        }
+
+        if(this->m_SampleVectors.size() != b.m_SampleVectors.size()){
+            if(this->debug) std::cout << "number of sample vectors not equal." << std::endl;
+            return false;
+        }
+        for(unsigned i=0; i<this->m_SampleVectors.size(); i++){
+            if((this->m_SampleVectors[i] - b.m_SampleVectors[i]).norm()>0){
+                if(this->debug) std::cout << "sample vectors not equal." << std::endl;
+                return false;
+            }
+        }
+
+        if(this->m_LabelVectors.size() != b.m_LabelVectors.size()){
+            if(this->debug) std::cout << "number of label vectors not equal." << std::endl;
+            return false;
+        }
+        for(unsigned i=0; i<this->m_LabelVectors.size(); i++){
+            if((this->m_LabelVectors[i] - b.m_LabelVectors[i]).norm()>0) {
+                if(this->debug) std::cout << "label vectors not equal." << std::endl;
+                return false;
+            }
+        }
+        if(this->m_Kernel->ToString() != b.m_Kernel->ToString() ||
+                this->m_Kernel->GetParameter() != b.m_Kernel->GetParameter()){
+            if(this->debug) std::cout << "kernel not equal." << std::endl;
+            return false;
+        }
+        if(this->m_Sigma != b.m_Sigma){
+            if(this->debug) std::cout << "sigma not equal." << std::endl;
+            return false;
+        }
+        if(this->m_Initialized != b.m_Initialized){
+            if(this->debug) std::cout << "initialization state not equal." << std::endl;
+            return false;
+        }
+        if(this->m_InputDimension != b.m_InputDimension){
+            if(this->debug) std::cout << "input dimension not equal." << std::endl;
+            return false;
+        }
+        if(this->m_OutputDimension != b.m_OutputDimension){
+            if(this->debug) std::cout << "output dimension not equal." << std::endl;
+            return false;
+        }
+        if(this->debug != b.debug){
+            if(this->debug) std::cout << "debug state not equal." << std::endl;
+            return false;
+        }
+        if(this->debug) std::cout << "is equal!" << std::endl;
+        return true;
+    }
 
 private:
 	/*

@@ -7,6 +7,7 @@
 #include "GaussianProcess.h"
 #include "Kernel.h"
 
+
 typedef GaussianKernel<double>		KernelType;
 typedef std::shared_ptr<KernelType> KernelTypePointer;
 typedef GaussianProcess<double> GaussianProcessType;
