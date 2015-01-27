@@ -161,10 +161,17 @@ public:
 		WriteMatrix<MatrixType>(Y, prefix+"-LabelVectors.txt");
 
 		// save parameters
-		// KernelType, KernelParameter, noise, InputDimension, OutputDimension
+        // KernelType, #KernelParameters, KernelParameters, noise, InputDimension, OutputDimension
 		std::ofstream parameter_outfile;
-		parameter_outfile.open(std::string(prefix+"-ParameterFile.txt").c_str());
-        parameter_outfile << m_Kernel->ToString() << " " << m_Kernel->GetParameter() << " " << m_Sigma << " " << m_InputDimension << " " << m_OutputDimension << " " << debug;
+        parameter_outfile.open(std::string(prefix+"-ParameterFile.txt").c_str());
+
+        typename KernelType::ParameterVectorType kernel_parameters = m_Kernel->GetParameters();
+        parameter_outfile << m_Kernel->ToString() << " " << kernel_parameters.size() << " ";
+        for(unsigned i=0; i<kernel_parameters.size(); i++){
+            parameter_outfile << kernel_parameters[i] << " ";
+        }
+
+        parameter_outfile << m_Sigma << " " << m_InputDimension << " " << m_OutputDimension << " " << debug;
 		parameter_outfile.close();
 	}
 
@@ -177,7 +184,7 @@ public:
 			std::cout << "\t " << prefix+"-ParameterFile.txt" << std::endl;
 		}
 
-		// load sample vectors
+        // load regression vectors
 		std::string rv_filename = prefix+"-RegressionVectors.txt";
 		fs::path rv_file(rv_filename.c_str());
 		if(!(fs::exists(rv_file) && !fs::is_directory(rv_file))){
@@ -219,27 +226,51 @@ public:
 		parameter_infile.open( pf_filename.c_str() );
 
 		std::string kernel_type;
-		TScalarType kernel_parameter;
+        unsigned num_kernel_parameters = 0;
+        typename KernelType::ParameterVectorType kernel_parameters;
 
 		// reading parameter file
 		std::string line;
+        bool load = true;
 		if(std::getline(parameter_infile, line)) {
 			std::stringstream line_stream(line);
-			if(!(line_stream >> kernel_type &&
-					line_stream >> kernel_parameter &&
-					line_stream >> m_Sigma &&
+            if(!(line_stream >> kernel_type)){
+                load = false;
+            }
+            if(!(line_stream >> num_kernel_parameters)){
+                load = false;
+            }
+            for(unsigned p=0; p<num_kernel_parameters; p++){
+                double param;
+                if(!(line_stream >> param)){
+                    load = false;
+                }
+                else{
+                    kernel_parameters.push_back(param);
+                }
+            }
+            if(!(line_stream >> m_Sigma &&
 					line_stream >> m_InputDimension &&
                     line_stream >> m_OutputDimension &&
-                    line_stream >> debug)){
+                    line_stream >> debug) ||
+                    load == false){
 				throw std::string("GaussianProcess::Load: parameter file is corrupt");
 			}
 		}
 		parameter_infile.close();
 
-		typedef GaussianKernel<TScalarType>		KernelType;
-		typedef std::shared_ptr<KernelType> KernelTypePointer;
-		KernelTypePointer k(new KernelType(kernel_parameter));
-		m_Kernel = k;
+        if(kernel_type.compare("GaussianKernel")==0){
+            typedef GaussianKernel<TScalarType>		KernelType;
+            typedef std::shared_ptr<KernelType> KernelTypePointer;
+            if(kernel_parameters.size() != 2){
+                throw std::string("GaussianProcess::Load: wrong number of kernel parameters.");
+            }
+            KernelTypePointer k(new KernelType(kernel_parameters[0], kernel_parameters[1]));
+            m_Kernel = k;
+        }
+        else{
+            throw std::string("GaussianProcess::Load: kernel not recognized.");
+        }
 
 		m_Initialized = true;
 	}
@@ -256,7 +287,11 @@ public:
 		std::cout << std::endl;
 		std::cout << " - Kernel:" << std::endl;
 		std::cout << "       - Type:\t\t" << m_Kernel->ToString() << std::endl;
-		std::cout << "       - Parameter:\t" << m_Kernel->GetParameter() << std::endl;
+        std::cout << "       - Parameter:\t";
+        for(unsigned i=0; i<m_Kernel->GetParameters().size(); i++){
+            std::cout << m_Kernel->GetParameters()[i] << ", ";
+        }
+        std::cout << std::endl;
 		std::cout << "---------------------------------------" << std::endl;
 	}
 
@@ -289,10 +324,19 @@ public:
                 return false;
             }
         }
-        if(this->m_Kernel->ToString() != b.m_Kernel->ToString() ||
-                this->m_Kernel->GetParameter() != b.m_Kernel->GetParameter()){
+        if(this->m_Kernel->ToString() != b.m_Kernel->ToString()){
             if(this->debug) std::cout << "kernel not equal." << std::endl;
             return false;
+        }
+        if(this->m_Kernel->GetParameters().size() != b.m_Kernel->GetParameters().size()){
+            if(this->debug) std::cout << "number of kernel parameters not equal." << std::endl;
+            return false;
+        }
+        for(unsigned i=0; i<this->m_Kernel->GetParameters().size(); i++){
+            if(std::fabs(this->m_Kernel->GetParameters()[i] - b.m_Kernel->GetParameters()[i]) > 0) {
+                if(this->debug) std::cout << "kernel parameters not equal." << std::endl;
+                return false;
+            }
         }
         if(this->m_Sigma != b.m_Sigma){
             if(this->debug) std::cout << "sigma not equal." << std::endl;
