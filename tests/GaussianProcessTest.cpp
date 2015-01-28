@@ -51,7 +51,12 @@ void Test1(){
         err += std::fabs(gp->Predict(x)(0)-std::sin(x(0)));
 	}
 
-    std::cout << " [done]. Prediction error: " << err << std::endl;
+    if(err>0.0005){
+        std::cout << " [failed]." << std::endl;
+    }
+    else{
+        std::cout << " [passed]." << std::endl;
+    }
 }
 
 void Test2(){
@@ -91,7 +96,12 @@ void Test2(){
                std::fabs(gp->Predict(x)(1)-std::cos(x(1)));
 	}
 
-    std::cout << " [done]. Prediction error: " << err << std::endl;
+    if(err>0.005){
+        std::cout << " [failed]." << std::endl;
+    }
+    else{
+        std::cout << " [passed]." << std::endl;
+    }
 }
 
 void Test3(){
@@ -124,7 +134,7 @@ void Test3(){
 		gp->Predict(x);
 	}
     float t_prediction= ((float)(clock()-t0))/CLOCKS_PER_SEC;
-    std::cout << " [done]. Training time: " << t_training;
+    std::cout << " [passed]. Training time: " << t_training;
     std::cout << "sec , prediction time: " << t_prediction << " sec" << std::endl;
 }
 
@@ -181,29 +191,32 @@ void Test4(){
 	gp->Initialize();
 
 
+    bool debug = false;
 	unsigned number_of_tests = 50;
-    std::cout << "[";
+    if(debug) std::cout << "[";
 	for(unsigned i=0; i<number_of_tests; i++){
-		std::cout << "[";
+        if(debug) std::cout << "[";
 		for(unsigned j=0; j<number_of_tests; j++){
 			VectorType x(2);
 			x(0) = double(i)/8;
 			x(1) = double(j)/8;
             if(j<number_of_tests-1){
-                std::cout << gp->Predict(x) << ", ";
+                if(debug) std::cout << gp->Predict(x) << ", ";
             }
             else{
-                std::cout << gp->Predict(x);
+                if(debug) std::cout << gp->Predict(x);
             }
 		}
         if(i<number_of_tests-1){
-            std::cout << "],";
+            if(debug) std::cout << "],";
         }
         else{
-            std::cout << "]";
+            if(debug) std::cout << "]";
         }
 	}
-    std::cout << "]" << std::endl;
+    if(debug) std::cout << "]" << std::endl;
+
+    std::cout << " [passed]." << std::endl;
 }
 
 void Test5(){
@@ -240,7 +253,13 @@ void Test5(){
 		VectorType v = gp->PredictDerivative(x,D);
         err += std::fabs(D(0,0) - std::cos(x(0)));
 	}
-    std::cout << " [done]. Predictione error: " << err << std::endl;
+
+    if(err>0.6){
+        std::cout << " [failed]." << std::endl;
+    }
+    else{
+        std::cout << " [passed]." << std::endl;
+    }
 }
 
 void Test6(){
@@ -351,7 +370,7 @@ void Test7(){
 }
 
 int main (int argc, char *argv[]){
-
+    std::cout << "Gaussian process regression test: " << std::endl;
     Test1();
     Test2();
     Test3();

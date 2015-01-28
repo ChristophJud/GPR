@@ -98,7 +98,9 @@ public:
 
     // Comparison operator
     bool operator ==(const GaussianProcess<TScalarType> &b) const;
-
+    bool operator !=(const GaussianProcess<TScalarType> &b) const{
+        return ! operator ==(b);
+    }
 
 private:
 

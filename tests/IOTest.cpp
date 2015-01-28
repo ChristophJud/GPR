@@ -79,7 +79,7 @@ void Test2(){
      * Test 2: gaussian process save and load
      */
     std::cout << "Test 2: save/load gaussian process... " << std::flush;
-    KernelTypePointer k(new KernelType(1.8));
+    KernelTypePointer k(new KernelType(std::sqrt(2)));
     GaussianProcessTypePointer gp(new GaussianProcessType(k));
     gp->SetSigma(0);
 
@@ -115,7 +115,7 @@ void Test2(){
 
 
 int main (int argc, char *argv[]){
-
+    std::cout << "Input/Output test:" << std::endl;
     Test1();
     Test2();
 

@@ -1,5 +1,6 @@
 #include <fstream>
 #include <iostream>
+#include <iomanip>
 
 #include <boost/filesystem.hpp>
 namespace fs = boost::filesystem;
@@ -109,6 +110,7 @@ void GaussianProcess<TScalarType>::Save(std::string prefix){
     std::ofstream parameter_outfile;
     parameter_outfile.open(std::string(prefix+"-ParameterFile.txt").c_str());
 
+    parameter_outfile << std::setprecision(std::numeric_limits<TScalarType>::digits10 +1);
     typename KernelType::ParameterVectorType kernel_parameters = m_Kernel->GetParameters();
     parameter_outfile << m_Kernel->ToString() << " " << kernel_parameters.size() << " ";
     for(unsigned i=0; i<kernel_parameters.size(); i++){
@@ -282,19 +284,9 @@ bool GaussianProcess<TScalarType>::operator ==(const GaussianProcess<TScalarType
             return false;
         }
     }
-    if(this->m_Kernel->ToString() != b.m_Kernel->ToString()){
+    if(*this->m_Kernel.get() != *b.m_Kernel.get()){
         if(this->debug) std::cout << "kernel not equal." << std::endl;
         return false;
-    }
-    if(this->m_Kernel->GetParameters().size() != b.m_Kernel->GetParameters().size()){
-        if(this->debug) std::cout << "number of kernel parameters not equal." << std::endl;
-        return false;
-    }
-    for(unsigned i=0; i<this->m_Kernel->GetParameters().size(); i++){
-        if(std::fabs(this->m_Kernel->GetParameters()[i] - b.m_Kernel->GetParameters()[i]) > 0) {
-            if(this->debug) std::cout << "kernel parameters not equal." << std::endl;
-            return false;
-        }
     }
     if(this->m_Sigma != b.m_Sigma){
         if(this->debug) std::cout << "sigma not equal." << std::endl;

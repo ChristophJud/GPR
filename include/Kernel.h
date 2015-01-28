@@ -24,9 +24,7 @@ public:
 		throw std::string("Kernel: operator() is not implemented.");
 	}
 
-	virtual inline std::string ToString(){
-		throw std::string("Kernel: ToString() is not implemented.");
-	}
+    virtual std::string ToString() const = 0;
 
     virtual inline const ParameterVectorType GetParameters(){
         return m_parameters;
@@ -35,7 +33,27 @@ public:
 	Kernel() {}
 	virtual ~Kernel() {}
 
+    virtual bool operator !=(const Kernel<TScalarType> &b) const{
+        return ! operator ==(b);
+    }
+
+    virtual bool operator ==(const Kernel<TScalarType> &b) const{
+        if(this->ToString() != b.ToString()){
+            return false;
+        }
+        if(this->m_parameters.size() != b.m_parameters.size()){
+            return false;
+        }
+        for(unsigned i=0; i<this->m_parameters.size(); i++){
+            if(this->m_parameters[i] - b.m_parameters[i]>0){
+                return false;
+            }
+        }
+        return true;
+    }
+
 protected:
+    // in m_parameters, all parameters which should be saved/loaded have to be pushed
     ParameterVectorType m_parameters;
 private:
 	  Kernel(const Self&); //purposely not implemented
@@ -69,7 +87,7 @@ public:
 	}
 	virtual ~GaussianKernel() {}
 
-	std::string ToString(){ return "GaussianKernel"; }
+    virtual std::string ToString() const{ return "GaussianKernel"; }
 
 private:
     TScalarType m_Sigma;
@@ -123,7 +141,7 @@ public:
     }
     virtual ~PeriodicKernel() {}
 
-    std::string ToString(){ return "PeriodicKernel"; }
+    virtual std::string ToString() const{ return "PeriodicKernel"; }
 
 private:
     TScalarType m_Alpha;

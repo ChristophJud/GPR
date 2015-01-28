@@ -89,7 +89,13 @@ void Test1(){
         y_predict[i] = gp->Predict(x)(0);
     }
 
-    std::cout << " [done]. Precision error: " << (y-y_predict).norm() << std::endl;
+    double err = (y-y_predict).norm();
+    if(err>0.4){
+        std::cout << " [failed]." << std::endl;
+    }
+    else{
+        std::cout << " [passed]." << std::endl;
+    }
 
 }
 
@@ -134,7 +140,7 @@ void Test2(){
 
 
 int main (int argc, char *argv[]){
-
+    std::cout << "Periodic kernel test: " << std::endl;
     Test1();
     Test2();
 
