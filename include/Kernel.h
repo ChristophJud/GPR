@@ -85,6 +85,9 @@ private:
  * Periodic Kernel: k(x,y) = alpha^2 exp( -0.5 sum_d=1^D sin(b(x_d-y_d))/sigma_d)^2 )
  *
  * - D is the number of input dimensions
+ * - b is determined as follows: pi/b is the period length
+ * - alpha is the expected amplitude
+ * - sigma is the smoothnes (more difficult to estimate)
  */
 template <class TScalarType>
 class PeriodicKernel : public Kernel<TScalarType>{
