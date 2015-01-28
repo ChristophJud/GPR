@@ -3,6 +3,8 @@
 
 #include <string>
 
+namespace gpr{
+
 template<typename _Matrix_Type_>
 _Matrix_Type_ ReadMatrix(std::string filename);
 
@@ -11,5 +13,6 @@ void WriteMatrix(const _Matrix_Type_& matrix, std::string filename);
 
 bool MatrixIOTest();
 
+}
 
 #endif

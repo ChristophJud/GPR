@@ -11,6 +11,7 @@
 #include "Kernel.h"
 #include "MatrixIO.h"
 
+using namespace gpr;
 
 typedef GaussianKernel<double>		DPKernelType;
 typedef std::shared_ptr<DPKernelType> DPKernelTypePointer;

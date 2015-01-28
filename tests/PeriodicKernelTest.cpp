@@ -12,6 +12,7 @@
 #include "Kernel.h"
 #include "MatrixIO.h"
 
+using namespace gpr;
 
 typedef PeriodicKernel<double>		DPKernelType;
 typedef std::shared_ptr<DPKernelType> DPKernelTypePointer;

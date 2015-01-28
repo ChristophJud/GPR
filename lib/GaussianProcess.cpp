@@ -8,6 +8,7 @@ namespace fs = boost::filesystem;
 #include "GaussianProcess.h"
 #include "MatrixIO.h"
 
+namespace gpr{
 
 template< class TScalarType >
 void GaussianProcess<TScalarType>::AddSample(const typename GaussianProcess<TScalarType>::VectorType &x,
@@ -422,3 +423,4 @@ void GaussianProcess<TScalarType>::CheckOutputDimension(const typename GaussianP
 template class GaussianProcess<float>;
 template class GaussianProcess<double>;
 
+}

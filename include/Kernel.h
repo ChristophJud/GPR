@@ -8,6 +8,7 @@
 
 #include "MatrixIO.h"
 
+namespace gpr{
 
 /*
  * Kernel interface. Operator () has to be implemented in subclass
@@ -153,5 +154,6 @@ private:
     void operator=(const Self&); //purposely not implemented
 };
 
+}
 
 #endif

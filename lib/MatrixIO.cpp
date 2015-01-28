@@ -7,6 +7,7 @@
 
 #include "MatrixIO.h"
 
+namespace gpr{
 
 typedef Eigen::Matrix<float, Eigen::Dynamic, 1> VectorType;
 typedef Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> MatrixType;
@@ -104,3 +105,4 @@ template MatrixTypeDoublePrecision ReadMatrix<MatrixTypeDoublePrecision> (std::s
 template void WriteMatrix<MatrixType> (const MatrixType&, std::string);
 template void WriteMatrix<MatrixTypeDoublePrecision> (const MatrixTypeDoublePrecision&, std::string);
 
+}

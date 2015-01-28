@@ -9,6 +9,7 @@
 
 #include "Kernel.h"
 
+namespace gpr{
 
 template< class TScalarType >
 class GaussianProcess
@@ -157,5 +158,6 @@ private:
 	void operator=(const Self &); //purposely not implemented
 };
 
+}
 
 #endif
