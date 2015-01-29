@@ -6,6 +6,7 @@
 namespace fs = boost::filesystem;
 
 #include "GaussianProcess.h"
+#include "KernelFactory.h"
 #include "MatrixIO.h"
 
 namespace gpr{
@@ -189,7 +190,7 @@ void GaussianProcess<TScalarType>::Load(std::string prefix){
             load = false;
         }
         for(unsigned p=0; p<num_kernel_parameters; p++){
-            double param;
+            typename KernelType::ParameterType param;
             if(!(line_stream >> param)){
                 load = false;
             }
@@ -209,26 +210,46 @@ void GaussianProcess<TScalarType>::Load(std::string prefix){
 
     if(kernel_type.compare("GaussianKernel")==0){
         typedef GaussianKernel<TScalarType>		KernelType;
-        typedef std::shared_ptr<KernelType> KernelTypePointer;
-        if(kernel_parameters.size() != 2){
-            throw std::string("GaussianProcess::Load: wrong number of kernel parameters.");
-        }
-        KernelTypePointer k(new KernelType(kernel_parameters[0], kernel_parameters[1]));
+        typedef std::shared_ptr<KernelType>     KernelTypePointer;
+
+        KernelTypePointer k(dynamic_cast<KernelType*>(KernelFactory<TScalarType>::Load(kernel_type, kernel_parameters)));
         m_Kernel = k;
     }
     else if(kernel_type.compare("PeriodicKernel")==0){
         typedef PeriodicKernel<TScalarType>		KernelType;
-        typedef std::shared_ptr<KernelType> KernelTypePointer;
-        if(kernel_parameters.size() != 3){
-            throw std::string("GaussianProcess::Load: wrong number of kernel parameters.");
-        }
-        KernelTypePointer k(new KernelType(kernel_parameters[0],
-                                           kernel_parameters[1],
-                                           kernel_parameters[2]));
+        typedef std::shared_ptr<KernelType>     KernelTypePointer;
+
+        KernelTypePointer k(dynamic_cast<KernelType*>(KernelFactory<TScalarType>::Load(kernel_type, kernel_parameters)));
         m_Kernel = k;
     }
     else{
-        throw std::string("GaussianProcess::Load: kernel not recognized.");
+        std::size_t found = kernel_type.find("SumKernel");
+        if(found != std::string::npos){
+            std::string sumkernel;
+            std::string kernel1;
+            std::string kernel2;
+
+            // parse summands
+            std::stringstream ss(kernel_type);
+            if(!std::getline(ss, sumkernel, '#') && sumkernel.compare("SumKernel")){
+                throw std::string("GaussianProcess::Load: failed to tokanize kernel name string");
+            }
+            if(!std::getline(ss, kernel1, '#')){
+                throw std::string("GaussianProcess::Load: failed to tokanize kernel name string");
+            }
+            if(!std::getline(ss, kernel2, '#')){
+                throw std::string("GaussianProcess::Load: failed to tokanize kernel name string");
+            }
+
+            typedef SumKernel<TScalarType>		KernelType;
+            typedef std::shared_ptr<KernelType>     KernelTypePointer;
+
+            KernelTypePointer k(dynamic_cast<KernelType*>(KernelFactory<TScalarType>::Load(sumkernel, kernel_parameters)));
+            m_Kernel = k;
+        }
+        else{
+            throw std::string("GaussianProcess::Load: kernel not recognized.");
+        }
     }
 
     m_Initialized = true;
@@ -415,12 +436,13 @@ template< class TScalarType >
 void GaussianProcess<TScalarType>::CheckOutputDimension(const typename GaussianProcess<TScalarType>::VectorType &y, std::string msg_prefix) const{
     if(y.size()!=m_OutputDimension){
         std::stringstream error_msg;
-        error_msg << msg_prefix << "dimension of output vector ("<< y.size() << ") does not correspond to the output dimension (" << m_OutputDimension << ".";
+        error_msg << msg_prefix << "dimension of output vector ("<< y.size() << ") does not correspond to the output dimension (" << m_OutputDimension << ").";
         throw std::string(error_msg.str());
     }
 }
 
-template class GaussianProcess<float>;
-template class GaussianProcess<double>;
 
 }
+
+template class gpr::GaussianProcess<float>;
+template class gpr::GaussianProcess<double>;

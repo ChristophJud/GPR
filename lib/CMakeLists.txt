@@ -1,6 +1,6 @@
 SET(gp_lib_src
 	MatrixIO.cpp
-	GaussianProcess.cpp
+	GaussianProcess.cpp	
 )
 ADD_LIBRARY(gplib SHARED ${gp_lib_src})
 
