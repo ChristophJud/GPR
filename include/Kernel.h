@@ -24,6 +24,7 @@ class Kernel{
 public:
 
 	typedef Kernel Self;
+    typedef std::shared_ptr<Self> SelfPointer;
 	typedef Eigen::Matrix<TScalarType, Eigen::Dynamic, 1> VectorType;
     typedef std::string ParameterType;
     typedef std::vector<ParameterType> ParameterVectorType;
@@ -44,7 +45,7 @@ public:
     Kernel() {
         KernelFactory<TScalarType>::RegisterKernels();
     }
-	virtual ~Kernel() {}
+    virtual ~Kernel() {}
 
 
     // Comparison operators (mainly used by the tests)
@@ -102,7 +103,9 @@ class SumKernel : public Kernel<TScalarType>{
 public:
 
     typedef Kernel<TScalarType> Superclass;
+    typedef typename Superclass::SelfPointer SuperclassPointer;
     typedef SumKernel Self;
+    typedef std::shared_ptr<Self> SelfPointer;
     typedef typename Superclass::VectorType VectorType;
     typedef typename Superclass::ParameterType ParameterType;
     typedef typename Superclass::ParameterVectorType ParameterVectorType;
@@ -114,7 +117,7 @@ public:
     // Constructor takes two kernel pointers
     // If the parameters are available, it is better to Load
     // the SumKernel from the KernelFactory
-    SumKernel(Superclass* const k1, Superclass* const k2) : Superclass(),
+    SumKernel(SuperclassPointer const k1, SuperclassPointer const k2) : Superclass(),
         k_string1(k1->ToString()),
         k_string2(k2->ToString()),
         num_params1(k1->GetParameters().size()),
@@ -147,7 +150,7 @@ public:
 
     // Needed from the KernelFactory to instantiate
     // a kernel given a parameter vector;
-    static Self* Load(const ParameterVectorType& parameters){
+    static SelfPointer Load(const ParameterVectorType& parameters){
         if(parameters.size() < 4){
             throw std::string("SumKernel::Load: wrong number of kernel parameters.");
         }
@@ -174,8 +177,8 @@ public:
         }
 
         // return a sum kernel where the summands are loaded from the kernel factory
-        return new Self(KernelFactory<TScalarType>::Load(ks1, params1),
-                        KernelFactory<TScalarType>::Load(ks2, params2));
+        return SelfPointer(new Self(KernelFactory<TScalarType>::Load(ks1, params1),
+                        KernelFactory<TScalarType>::Load(ks2, params2)));
     }
 
 private:
@@ -183,8 +186,8 @@ private:
     const std::string k_string2;
     const unsigned num_params1;
     const unsigned num_params2;
-    const Superclass* const m_Kernel1;
-    const Superclass* const m_Kernel2;
+    const SuperclassPointer m_Kernel1;
+    const SuperclassPointer m_Kernel2;
 
     SumKernel(const Self&); //purposely not implemented
     void operator=(const Self&); //purposely not implemented
@@ -203,6 +206,7 @@ public:
 
     typedef Kernel<TScalarType> Superclass;
     typedef GaussianKernel Self;
+    typedef std::shared_ptr<Self> SelfPointer;
     typedef typename Superclass::VectorType VectorType;
     typedef typename Superclass::ParameterVectorType ParameterVectorType;
 
@@ -232,11 +236,11 @@ public:
 
     // Needed from the KernelFactory to instantiate
     // a kernel given a parameter vector;
-    static Self* Load(const ParameterVectorType& parameters){
+    static SelfPointer Load(const ParameterVectorType& parameters){
         if(parameters.size() != 2){
             throw std::string("GaussianKernel::Load: wrong number of kernel parameters.");
         }
-        return new Self(Self::S2P(parameters[0]), Self::S2P(parameters[1]));
+        return SelfPointer(new Self(Self::S2P(parameters[0]), Self::S2P(parameters[1])));
     }
 
 private:
@@ -263,6 +267,7 @@ public:
 
     typedef Kernel<TScalarType> Superclass;
     typedef PeriodicKernel Self;
+    typedef std::shared_ptr<Self> SelfPointer;
     typedef typename Superclass::VectorType VectorType;
     typedef typename Superclass::ParameterVectorType ParameterVectorType;
 
@@ -301,11 +306,11 @@ public:
 
     // Needed from the KernelFactory to instantiate
     // a kernel given a parameter vector;
-    static Self* Load(const ParameterVectorType& parameters){
+    static SelfPointer Load(const ParameterVectorType& parameters){
         if(parameters.size() != 3){
             throw std::string("PeriodicKernel::Load: wrong number of kernel parameters.");
         }
-        return new Self(Self::S2P(parameters[0]), Self::S2P(parameters[1]), Self::S2P(parameters[2]));
+        return SelfPointer(new Self(Self::S2P(parameters[0]), Self::S2P(parameters[1]), Self::S2P(parameters[2])));
     }
 private:
     TScalarType m_Alpha;

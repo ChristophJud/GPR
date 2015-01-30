@@ -1,4 +1,5 @@
 
+
 // compilation: g++ -I /home/jud/apps/Eigen_3.1.3/linux64/include/eigen3/ gp_main.cpp -o gpTest -std=c++0x
 
 #include <iostream>
@@ -14,30 +15,21 @@
 
 using namespace gpr;
 
+typedef GaussianProcess<float>                  GaussianProcessType;
+typedef std::shared_ptr<GaussianProcessType>    GaussianProcessTypePointer;
 
-template<typename T>
-void Test1(){
-    /*
-     * Test 1.1: perform regression
-     * Test 1.2: save/load sum kernel
-     */
-    std::cout << "Test 1.1: regression test with sum kernel... " << std::flush;
+typedef typename GaussianProcessType::VectorType     VectorType;
+typedef typename GaussianProcessType::MatrixType     MatrixType;
 
-
+// setup gaussian process and assign it to the gp_out argument
+GaussianProcessTypePointer BuildGaussianProcess(){
     // typedefs
-    typedef GaussianKernel<T>                   GaussianKernelType;
-    typedef std::shared_ptr<GaussianKernelType>         GaussianKernelTypePointer;
-    typedef PeriodicKernel<T>                   PeriodicKernelType;
-    typedef std::shared_ptr<PeriodicKernelType>         PeriodicKernelTypePointer;
-    typedef SumKernel<T>                        SumKernelType;
+    typedef GaussianKernel<float>                   GaussianKernelType;
+    typedef std::shared_ptr<GaussianKernelType> GaussianKernelTypePointer;
+    typedef PeriodicKernel<float>                   PeriodicKernelType;
+    typedef std::shared_ptr<PeriodicKernelType> PeriodicKernelTypePointer;
+    typedef SumKernel<float>                        SumKernelType;
     typedef std::shared_ptr<SumKernelType>      SumKernelTypePointer;
-
-    typedef GaussianProcess<T>                  GaussianProcessType;
-    typedef std::shared_ptr<GaussianProcessType> GaussianProcessTypePointer;
-
-    typedef typename GaussianProcessType::VectorType     VectorType;
-    typedef typename GaussianProcessType::MatrixType     MatrixType;
-
 
     // ground truth function
     auto f = [](double x)->double { return x/2.0 + std::sin(x)*std::cos(2.2*std::sin(x)); };
@@ -83,17 +75,41 @@ void Test1(){
 
         gp->AddSample(x, y);
     }
+
     gp->Initialize();
 
+    return gp;
+}
+
+
+void Test1(){
+    /*
+     * Test 1: scope test to show if everything with memory behaves well.
+     */
+    std::cout << "Test 1: scope test... " << std::flush;
+
+    GaussianProcessTypePointer gp = BuildGaussianProcess();
+
+    double interval_start = 0;
+    double interval_end = 5 * 2*M_PI; // full interval
+    double interval_step = 0.1;
 
     //--------------------------------------------------------------------------------
-    // predict full intervall
+    // generating ground truth
+    unsigned gt_size = (interval_end-interval_start) / interval_step;
+    auto f = [](double x)->double { return x/2.0 + std::sin(x)*std::cos(2.2*std::sin(x)); };
+
+    //--------------------------------------------------------------------------------
+    // do some prediction
     VectorType y_predict(gt_size);
+    VectorType y(gt_size);
     for(unsigned i=0; i<gt_size; i++){
         VectorType x(1);
         x(0) = interval_start + i*interval_step;
         y_predict[i] = gp->Predict(x)(0);
+        y[i] = f(x(0));
     }
+
 
     double err = (y-y_predict).norm();
     if(err>3){
@@ -102,30 +118,13 @@ void Test1(){
     else{
         std::cout << " [passed]." << std::endl;
     }
-
-    std::cout << "Test 1.2: save/load sum kernel... " << std::flush;
-
-    gp->Save("/tmp/gp_io_test-");
-
-
-    GaussianKernelTypePointer k_dummy(new GaussianKernelType(1, 1));
-    GaussianProcessTypePointer gp_read(new GaussianProcessType(k_dummy));
-    gp_read->Load("/tmp/gp_io_test-");
-
-    if(*gp.get() == *gp_read.get()){
-        std::cout << " [passed]." << std::endl;
-    }
-    else{
-        std::cout << " [failed]." << std::endl;
-    }
 }
 
 
 int main (int argc, char *argv[]){
-    std::cout << "Sum kernel test: " << std::endl;
+    std::cout << "Scope test: " << std::endl;
     try{
-    Test1<float>();
-    Test1<double>();
+        Test1();
     }
     catch(std::string& s){
         std::cout << "Error: " << s << std::endl;

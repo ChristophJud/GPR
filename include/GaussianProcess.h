@@ -23,8 +23,6 @@ public:
     typedef Eigen::Matrix<TScalarType, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> MatrixType;
     typedef Eigen::DiagonalMatrix<TScalarType, Eigen::Dynamic> DiagMatrixType;
 
-	typedef std::shared_ptr<MatrixType> MatrixTypePointer;
-
 	typedef std::vector<VectorType> VectorListType;
 	typedef std::vector<MatrixType> MatrixListType;
 	
@@ -63,10 +61,10 @@ public:
                                                 m_InputDimension(0),
                                                 m_OutputDimension(0),
                                                 debug(false) {
-		m_Kernel = kernel;
+        m_Kernel = kernel;
 	}
 
-	virtual ~GaussianProcess() {}
+    virtual ~GaussianProcess() {}
 
 
     // Some get / set methods

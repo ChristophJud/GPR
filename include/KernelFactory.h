@@ -19,12 +19,12 @@ namespace gpr{
 // in the map of KernelFactory. These methods are called
 // if one loads a kernel from the KernelFactory.
 template<typename TKernel>
-Kernel<float>* Create(const Kernel<float>::ParameterVectorType& parameters){
+std::shared_ptr< Kernel<float> > Create(const Kernel<float>::ParameterVectorType& parameters){
     return TKernel::Load(parameters);
 }
 
 template<typename TKernel>
-Kernel<double>* Create(const Kernel<double>::ParameterVectorType& parameters){
+std::shared_ptr< Kernel<double> > Create(const Kernel<double>::ParameterVectorType& parameters){
     return TKernel::Load(parameters);
 }
 
@@ -33,7 +33,8 @@ template <class TScalarType>
 class KernelFactory{
 public:
     typedef Kernel<TScalarType> KernelType;
-    typedef KernelType* (*ComponentFactoryFuncPtr)(const typename KernelType::ParameterVectorType&); // function pointer to Create<TKernel>
+    typedef std::shared_ptr<KernelType> KernelTypePointer;
+    typedef KernelTypePointer (*ComponentFactoryFuncPtr)(const typename KernelType::ParameterVectorType&); // function pointer to Create<TKernel>
     typedef std::map<const std::string, ComponentFactoryFuncPtr> MapType;
 
     static std::shared_ptr<MapType> m_Map;
@@ -47,7 +48,7 @@ public:
         m_Map->insert(std::make_pair(componentName, function));
     }
 
-    static KernelType* Load(const std::string& kernel_string, const typename KernelType::ParameterVectorType& parameters){
+    static KernelTypePointer Load(const std::string& kernel_string, const typename KernelType::ParameterVectorType& parameters){
         typename MapType::iterator it = m_Map->find(kernel_string);
         return (*it->second)(parameters);
     }
@@ -61,8 +62,8 @@ public:
 
 //template<> KernelFactory<float>::MapTyp KernelFactory<float>::m_Map();
 
-template<> std::shared_ptr< std::map<const std::string, Kernel<float>* (*)(const typename Kernel<float>::ParameterVectorType&)> > KernelFactory<float>::m_Map( new std::map<const std::string, Kernel<float>* (*)(const typename Kernel<float>::ParameterVectorType&)>());
-template<> std::shared_ptr< std::map<const std::string, Kernel<double>* (*)(const typename Kernel<double>::ParameterVectorType&)> > KernelFactory<double>::m_Map( new std::map<const std::string, Kernel<double>* (*)(const typename Kernel<double>::ParameterVectorType&)>());
+template<> std::shared_ptr< std::map<const std::string, std::shared_ptr< Kernel<float> > (*)(const typename Kernel<float>::ParameterVectorType&)> > KernelFactory<float>::m_Map( new std::map<const std::string, std::shared_ptr< Kernel<float> > (*)(const typename Kernel<float>::ParameterVectorType&)>());
+template<> std::shared_ptr< std::map<const std::string, std::shared_ptr< Kernel<double> > (*)(const typename Kernel<double>::ParameterVectorType&)> > KernelFactory<double>::m_Map( new std::map<const std::string, std::shared_ptr< Kernel<double> > (*)(const typename Kernel<double>::ParameterVectorType&)>());
 
 template class KernelFactory<float>;
 template class KernelFactory<double>;

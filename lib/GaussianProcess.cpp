@@ -212,14 +212,14 @@ void GaussianProcess<TScalarType>::Load(std::string prefix){
         typedef GaussianKernel<TScalarType>		KernelType;
         typedef std::shared_ptr<KernelType>     KernelTypePointer;
 
-        KernelTypePointer k(dynamic_cast<KernelType*>(KernelFactory<TScalarType>::Load(kernel_type, kernel_parameters)));
+        KernelTypePointer k = std::dynamic_pointer_cast<KernelType>(KernelFactory<TScalarType>::Load(kernel_type, kernel_parameters));
         m_Kernel = k;
     }
     else if(kernel_type.compare("PeriodicKernel")==0){
         typedef PeriodicKernel<TScalarType>		KernelType;
         typedef std::shared_ptr<KernelType>     KernelTypePointer;
 
-        KernelTypePointer k(dynamic_cast<KernelType*>(KernelFactory<TScalarType>::Load(kernel_type, kernel_parameters)));
+        KernelTypePointer k = std::dynamic_pointer_cast<KernelType>(KernelFactory<TScalarType>::Load(kernel_type, kernel_parameters));
         m_Kernel = k;
     }
     else{
@@ -244,7 +244,7 @@ void GaussianProcess<TScalarType>::Load(std::string prefix){
             typedef SumKernel<TScalarType>		KernelType;
             typedef std::shared_ptr<KernelType>     KernelTypePointer;
 
-            KernelTypePointer k(dynamic_cast<KernelType*>(KernelFactory<TScalarType>::Load(sumkernel, kernel_parameters)));
+            KernelTypePointer k = std::dynamic_pointer_cast<KernelType>(KernelFactory<TScalarType>::Load(sumkernel, kernel_parameters));
             m_Kernel = k;
         }
         else{
