@@ -24,7 +24,7 @@ void Test1(){
 	 */
     std::cout << "Test 1: sinus regression... " << std::flush;
 
-    KernelTypePointer k(new KernelType(1.7));
+    KernelTypePointer k(new KernelType(2.889));
 	GaussianProcessTypePointer gp(new GaussianProcessType(k));
 	gp->SetSigma(0);
 
@@ -66,7 +66,7 @@ void Test2(){
 	 * - try to learn simultainiously sin and cos
 	 */
     std::cout << "Test 2: 2D regression (sin/cos)... " << std::flush;
-    KernelTypePointer k(new KernelType(1.8));
+    KernelTypePointer k(new KernelType(3.24));
 	GaussianProcessTypePointer gp(new GaussianProcessType(k));
 	gp->SetSigma(0);
 
@@ -110,7 +110,7 @@ void Test3(){
 	 * Test 3: performance test, just random numbers
 	 */
     std::cout << "Test 3: performance test... " << std::flush;
-    KernelTypePointer k(new KernelType(2));
+    KernelTypePointer k(new KernelType(4));
 	GaussianProcessTypePointer gp(new GaussianProcessType(k));
 	gp->SetSigma(0.01);
 
@@ -145,7 +145,7 @@ void Test4(){
 	 * - try to learn function over some 2D landmarks
 	 */
     std::cout << "Test 4: vectorial input / scalar output..." << std::endl;
-    KernelTypePointer k(new KernelType(1.8));
+    KernelTypePointer k(new KernelType(3.24));
 	GaussianProcessTypePointer gp(new GaussianProcessType(k));
     gp->SetSigma(0.000);
 
@@ -269,7 +269,7 @@ void Test6(){
 	 * - try to learn simultainiously derivative of sin and cos and linear curve
 	 */
     std::cout << "Test 6: test derivative process of vectorial input..." << std::flush;
-    KernelTypePointer k(new KernelType(1.1));
+    KernelTypePointer k(new KernelType(1.2));
 	GaussianProcessTypePointer gp(new GaussianProcessType(k));
     gp->SetSigma(0.01);
 	//gp->DebugOn();

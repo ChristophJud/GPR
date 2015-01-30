@@ -57,8 +57,8 @@ GaussianProcessTypePointer BuildGaussianProcess(){
     double interval_training_end = 2 * 2*M_PI; // interval to train
     unsigned number_of_samples = 50;
 
-    PeriodicKernelTypePointer   pk(new PeriodicKernelType(0.77, 0.5, 0.4));
-    GaussianKernelTypePointer   gk(new GaussianKernelType(11.5, M_PI));
+    PeriodicKernelTypePointer   pk(new PeriodicKernelType(0.59, 0.5, 0.4));
+    GaussianKernelTypePointer   gk(new GaussianKernelType(130.0, M_PI));
     SumKernelTypePointer        sk(new SumKernelType(pk, gk));
 
     GaussianProcessTypePointer gp(new GaussianProcessType(sk));

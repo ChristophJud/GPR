@@ -63,7 +63,7 @@ void Test1(){
     double interval_training_end = 2 * 2*M_PI; // interval to train
     unsigned number_of_samples = 50;
 
-    KernelTypePointer k(new KernelType(0.77, 0.5, 0.4)); // scale, period, smoothness
+    KernelTypePointer k(new KernelType(0.59, 0.5, 0.4)); // scale, period, smoothness
     GaussianProcessTypePointer gp(new GaussianProcessType(k));
     gp->SetSigma(noise); // noise
 
@@ -105,7 +105,7 @@ void Test2(){
      * Test 2: gaussian process save and load
      */
     std::cout << "Test 2: save/load gaussian process... " << std::flush;
-    KernelTypePointer k(new KernelType(1.8, 2.2, 0.3));
+    KernelTypePointer k(new KernelType(3.24, 2.2, 0.3));
     GaussianProcessTypePointer gp(new GaussianProcessType(k));
     gp->SetSigma(0);
 
