@@ -219,7 +219,6 @@ public:
     // with scalars or with strings (ParameterType)
     GaussianKernel(TScalarType sigma, TScalarType scale=1) : Superclass(),
             m_Sigma(sigma),
-            m_Sigma_Squared(sigma*sigma),
             m_Scale(scale) {
 
         this->m_parameters.push_back(Self::P2S(m_Sigma));
@@ -245,7 +244,6 @@ public:
 
 private:
     TScalarType m_Sigma;
-    TScalarType m_Sigma_Squared;
     TScalarType m_Scale;
 	
 	GaussianKernel(const Self&); //purposely not implemented
@@ -286,8 +284,7 @@ public:
                    TScalarType sigma) : Superclass(),
             m_Alpha(alpha),
             m_B(b),
-            m_Sigma(sigma),
-            m_Alpha_Squared(alpha*alpha)
+            m_Sigma(sigma)
             {
 
         this->m_parameters.push_back(Self::P2S(m_Alpha));
@@ -316,7 +313,6 @@ private:
     TScalarType m_Alpha;
     TScalarType m_B;
     TScalarType m_Sigma;
-    TScalarType m_Alpha_Squared;
 
     PeriodicKernel(const Self&); //purposely not implemented
     void operator=(const Self&); //purposely not implemented

@@ -59,6 +59,32 @@ GaussianProcess<TScalarType>::PredictDerivative(const typename GaussianProcess<T
     return (Kx.adjoint() * m_RegressionVectors).adjoint(); // return point prediction
 }
 
+template< class TScalarType >
+TScalarType
+GaussianProcess<TScalarType>::operator()(const typename GaussianProcess<TScalarType>::VectorType & x,
+                                         const typename GaussianProcess<TScalarType>::VectorType & y){
+    Initialize();
+    CheckInputDimension(x, "GaussianProcess::(): ");
+    CheckInputDimension(y, "GaussianProcess::(): ");
+    VectorType Kx;
+    ComputeKernelVector(x, Kx);
+    VectorType Ky;
+    ComputeKernelVector(y, Ky);
+    return (*m_Kernel)(x, y) - Kx.adjoint() * m_CoreMatrix * Ky;
+}
+
+template< class TScalarType >
+TScalarType
+GaussianProcess<TScalarType>::GetCredibleInterval(const typename GaussianProcess<TScalarType>::VectorType& x){
+    Initialize();
+    CheckInputDimension(x, "GaussianProcess::GetCredibleIntervall: ");
+    TScalarType c = 2*std::sqrt((*this)(x, x));
+    if(std::isnan(c)){
+        throw std::string("GaussianProcess::GetCredibleIntervall: prediction is instable.");
+    }
+    return c;
+}
+
 
 template< class TScalarType >
 void GaussianProcess<TScalarType>::Initialize(){
@@ -85,6 +111,7 @@ void GaussianProcess<TScalarType>::Save(std::string prefix){
     if(debug){
         std::cout << "GaussianProcess::Save: writing gaussian process: " << std::endl;
         std::cout << "\t " << prefix+"-RegressionVectors.txt" << std::endl;
+        std::cout << "\t " << prefix+"-CoreMatrix.txt" << std::endl;
         std::cout << "\t " << prefix+"-SampleVectors.txt" << std::endl;
         std::cout << "\t " << prefix+"-LabelVectors.txt" << std::endl;
         std::cout << "\t " << prefix+"-ParameterFile.txt" << std::endl;
@@ -92,6 +119,9 @@ void GaussianProcess<TScalarType>::Save(std::string prefix){
 
     // save regression vectors
     WriteMatrix<MatrixType>(m_RegressionVectors, prefix+"-RegressionVectors.txt");
+
+    // save regression vectors
+    WriteMatrix<MatrixType>(m_CoreMatrix, prefix+"-CoreMatrix.txt");
 
     // save sample vectors
     MatrixType X = MatrixType::Zero(m_SampleVectors[0].size(), m_SampleVectors.size());
@@ -128,6 +158,7 @@ void GaussianProcess<TScalarType>::Load(std::string prefix){
     if(debug){
         std::cout << "GaussianProcess::Load: loading gaussian process: " << std::endl;
         std::cout << "\t " << prefix+"-RegressionVectors.txt" << std::endl;
+        std::cout << "\t " << prefix+"-CoreMatrix.txt" << std::endl;
         std::cout << "\t " << prefix+"-SampleVectors.txt" << std::endl;
         std::cout << "\t " << prefix+"-LabelVectors.txt" << std::endl;
         std::cout << "\t " << prefix+"-ParameterFile.txt" << std::endl;
@@ -140,6 +171,14 @@ void GaussianProcess<TScalarType>::Load(std::string prefix){
         throw std::string("GaussianProcess::Load: "+rv_filename+" does not exist or is a directory.");
     }
     m_RegressionVectors = ReadMatrix<MatrixType>(rv_filename);
+
+    // load core matrix
+    std::string cm_filename = prefix+"-CoreMatrix.txt";
+    fs::path cm_file(cm_filename.c_str());
+    if(!(fs::exists(cm_file) && !fs::is_directory(cm_file))){
+        throw std::string("GaussianProcess::Load: "+cm_filename+" does not exist or is a directory.");
+    }
+    m_CoreMatrix = ReadMatrix<MatrixType>(cm_filename);
 
     // load sample vectors
     std::string sv_filename = prefix+"-SampleVectors.txt";
@@ -285,6 +324,11 @@ bool GaussianProcess<TScalarType>::operator ==(const GaussianProcess<TScalarType
         return false;
     }
 
+    if((this->m_CoreMatrix - b.m_CoreMatrix).norm() > 0){
+        if(this->debug) std::cout << "core matrices not equal." << std::endl;
+        return false;
+    }
+
     if(this->m_SampleVectors.size() != b.m_SampleVectors.size()){
         if(this->debug) std::cout << "number of sample vectors not equal." << std::endl;
         return false;
@@ -382,7 +426,11 @@ void GaussianProcess<TScalarType>::ComputeRegressionVectors(){
         K(i,i) += m_Sigma;
     }
 
+    // compute core matrix
+    m_CoreMatrix = K.inverse();
+
     // calculate label matrix
+    // TODO: if a mean support is implemented, the mean has to be subtracted from the labels!
     MatrixType Y;
     ComputeLabelMatrix(Y);
 
@@ -392,7 +440,7 @@ void GaussianProcess<TScalarType>::ComputeRegressionVectors(){
         std::cout << "GaussianProcess::ComputeRegressionVectors: inverting kernel matrix... ";
         std::cout.flush();
     }
-    m_RegressionVectors = K.inverse() * Y ;
+    m_RegressionVectors = m_CoreMatrix * Y ; // inv(K + sigma)*Y
     if(debug) std::cout << "[done]" << std::endl;
 }
 

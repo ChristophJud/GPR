@@ -44,10 +44,15 @@ public:
     VectorType PredictDerivative(const VectorType &x, MatrixType &D);
 
 
+    /*
+     * Returns the scalar product between x and y in the RKHS of this GP
+     */
+    TScalarType operator()(const VectorType & x, const VectorType & y);
 
-	inline TScalarType operator()(const VectorType & x, const VectorType & y) const{
-		throw std::string("GaussianProcess::Initialize: not implemented yet");
-	}
+    /*
+     * Returns the positive credible interval at point x
+     */
+    TScalarType GetCredibleInterval(const VectorType&x);
 	
 	/*
 	 * If sample data has changed perform learning step
@@ -145,6 +150,7 @@ private:
 	VectorListType m_SampleVectors;  // Dimensionality: TInputDimension
 	VectorListType m_LabelVectors;   // Dimensionality: TOutputDimension
 	MatrixType m_RegressionVectors; // for each output dimension there is one regression vector
+    MatrixType m_CoreMatrix;
 	
 	bool m_Initialized;
 	unsigned m_InputDimension;
