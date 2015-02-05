@@ -5,6 +5,8 @@
 #include <boost/filesystem.hpp>
 namespace fs = boost::filesystem;
 
+#include <Eigen/SVD>
+
 #include "GaussianProcess.h"
 #include "KernelFactory.h"
 #include "MatrixIO.h"
@@ -428,6 +430,8 @@ void GaussianProcess<TScalarType>::ComputeRegressionVectors(){
 
     // compute core matrix
     m_CoreMatrix = K.inverse();
+    //Eigen::SelfAdjointEigenSolver<MatrixType> es(K);
+    //m_CoreMatrix = es.eigenvectors() * VectorType(1.0/VectorType(es.eigenvalues()).array()).asDiagonal() * es.eigenvectors().transpose();
 
     // calculate label matrix
     // TODO: if a mean support is implemented, the mean has to be subtracted from the labels!

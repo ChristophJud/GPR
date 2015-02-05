@@ -101,7 +101,8 @@ void Test2(){
     unsigned number_of_samples = 50;
     VectorType mean = VectorType::Zero(number_of_samples);
     MatrixType K = MatrixType::Zero(number_of_samples,number_of_samples);
-#pragma omp parallel for
+
+    #pragma omp parallel for
     for(unsigned i=0; i<number_of_samples; i++){
         VectorType x1(1);
         x1(0) = i * 5.0/static_cast<double>(number_of_samples);
@@ -134,6 +135,8 @@ void Test2(){
     for(unsigned k=0; k<10; k++){
         VectorType r = rot * VectorType(GetRandomVector(number_of_samples).array() * scl.array()) + mean;
 
+        // since the noise of the gp is zero, at the landmark points,
+        // all samples have to match the mean
         if(std::fabs(r[10] - mean[10]) > 1e-9 ||
                 std::fabs(r[20] - mean[20]) > 1e-9 ||
                 std::fabs(r[30] - mean[30]) > 1e-9 ||

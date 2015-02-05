@@ -5,7 +5,6 @@ project(gaussianprocessregression)
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 FIND_PACKAGE(Boost COMPONENTS system filesystem program_options REQUIRED)
-
 FIND_PACKAGE( Eigen3 REQUIRED )
 
 INCLUDE_DIRECTORIES(
@@ -16,7 +15,7 @@ INCLUDE_DIRECTORIES(
 
 LINK_DIRECTORIES( ${Boost_LIBRARY_DIRS} )
 
-SET(CMAKE_CXX_FLAGS "-std=c++0x")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 FIND_PACKAGE( OpenMP REQUIRED)
 if(OPENMP_FOUND)
