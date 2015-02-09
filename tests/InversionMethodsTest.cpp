@@ -76,7 +76,7 @@ void Test1(){
     GaussianProcessTypePointer gp = GetGaussianProcess(GaussianProcessType::FullPivotLU);
     gp->Initialize();
     double err = EvaluateGaussianProcess(gp);
-    if(err>0.0005){
+    if(err>0.0006){
         std::cout << " [failed]. Prediction error: " << err << std::endl;
     }
     else{
@@ -94,7 +94,7 @@ void Test2(){
     GaussianProcessTypePointer gp = GetGaussianProcess(GaussianProcessType::JacobiSVD);
     gp->Initialize();
     double err = EvaluateGaussianProcess(gp);
-    if(err>0.0005){
+    if(err>0.0006){
         std::cout << " [failed]. Prediction error: " << err << std::endl;
     }
     else{
@@ -109,14 +109,19 @@ void Test3(){
      */
     std::cout << "Test 3: BDCSVD...\t\t" << std::flush;
 
-    GaussianProcessTypePointer gp = GetGaussianProcess(GaussianProcessType::BDCSVD);
-    gp->Initialize();
-    double err = EvaluateGaussianProcess(gp);
-    if(err>0.0005){
-        std::cout << " [failed]. Prediction error: " << err << std::endl;
+    try{
+        GaussianProcessTypePointer gp = GetGaussianProcess(GaussianProcessType::BDCSVD);
+        gp->Initialize();
+        double err = EvaluateGaussianProcess(gp);
+        if(err>0.0006){
+            std::cout << " [failed]. Prediction error: " << err << std::endl;
+        }
+        else{
+            std::cout << " [passed]." << std::endl;
+        }
     }
-    else{
-        std::cout << " [passed]." << std::endl;
+    catch(std::string& s){
+        std::cout << " [failed]. Because: " << s << std::endl;
     }
 }
 
@@ -130,7 +135,7 @@ void Test4(){
     GaussianProcessTypePointer gp = GetGaussianProcess(GaussianProcessType::SelfAdjointEigenSolver);
     gp->Initialize();
     double err = EvaluateGaussianProcess(gp);
-    if(err>0.0005){
+    if(err>0.0006){
         std::cout << "[failed]. Prediction error: " << err << std::endl;
     }
     else{

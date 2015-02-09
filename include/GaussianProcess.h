@@ -59,7 +59,7 @@ public:
      *  - SelfAdjointEigenSolver: this method is optimized for symmetric matrices.
      *                  Good for medium sized problems.
      */
-    typedef enum { FullPivotLU, JacobiSVD, BDCSVD, SelfAdjointEigenSolver } InversionMethod;
+    typedef enum { FullPivotLU=0, JacobiSVD=1, BDCSVD=2, SelfAdjointEigenSolver=3 } InversionMethod;
 	
 	/*
 	 * Add a new sample lable pair to the gaussian process
@@ -152,6 +152,11 @@ private:
 	 */
     void ComputeKernelMatrix(MatrixType &M) const;
 
+    /*
+     * Inversion of the kernel matrix.
+     */
+    void InvertKernelMatrix(const MatrixType &K, InversionMethod inv_method);
+
 	/*
 	 * Bring the label vectors in a matrix form Y,
 	 * where the rows are the labels.
@@ -192,7 +197,7 @@ private:
 	bool m_Initialized;
 	unsigned m_InputDimension;
 	unsigned m_OutputDimension;
-    InversionMethod m_InvMethod;
+    InversionMethod m_InvMethod; // is not saved/loaded
 
 	bool debug;
 
