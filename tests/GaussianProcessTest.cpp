@@ -37,7 +37,7 @@ void Test1(){
 	 * Test 1: scalar valued GP
 	 * - try to learn sinus function
 	 */
-    std::cout << "Test 1: sinus regression... " << std::flush;
+    std::cout << "Test 1: sinus regression...\t\t" << std::flush;
 
     KernelTypePointer k(new KernelType(2.889));
 	GaussianProcessTypePointer gp(new GaussianProcessType(k));
@@ -67,8 +67,8 @@ void Test1(){
         err += std::fabs(gp->Predict(x)(0)-std::sin(x(0)));
 	}
 
-    if(err>0.0005){
-        std::cout << " [failed]." << std::endl;
+    if(err>0.0008){
+        std::cout << " [failed]. Prediction error: " << err << std::endl;
     }
     else{
         std::cout << " [passed]." << std::endl;
@@ -80,7 +80,7 @@ void Test2(){
 	 * Test 2: vectorial input and vectorial output
 	 * - try to learn simultainiously sin and cos
 	 */
-    std::cout << "Test 2: 2D regression (sin/cos)... " << std::flush;
+    std::cout << "Test 2: 2D regression (sin/cos)...\t" << std::flush;
     KernelTypePointer k(new KernelType(3.24));
 	GaussianProcessTypePointer gp(new GaussianProcessType(k));
 	gp->SetSigma(0);
@@ -113,7 +113,7 @@ void Test2(){
 	}
 
     if(err>0.005){
-        std::cout << " [failed]." << std::endl;
+        std::cout << " [failed]. Prediction error: " << err << std::endl;
     }
     else{
         std::cout << " [passed]." << std::endl;
@@ -124,7 +124,7 @@ void Test3(){
 	/*
 	 * Test 3: performance test, just random numbers
 	 */
-    std::cout << "Test 3: performance test... " << std::flush;
+    std::cout << "Test 3: performance test...\t\t" << std::flush;
     KernelTypePointer k(new KernelType(4));
 	GaussianProcessTypePointer gp(new GaussianProcessType(k));
 	gp->SetSigma(0.01);
@@ -159,7 +159,7 @@ void Test4(){
 	 * Test 4: vectorial input and scalar output
 	 * - try to learn function over some 2D landmarks
 	 */
-    std::cout << "Test 4: vectorial input / scalar output..." << std::endl;
+    std::cout << "Test 4: vectorial input / scalar output..." << std::flush;
     KernelTypePointer k(new KernelType(3.24));
 	GaussianProcessTypePointer gp(new GaussianProcessType(k));
     gp->SetSigma(0.000);
@@ -271,7 +271,7 @@ void Test5(){
 	}
 
     if(err>0.6){
-        std::cout << " [failed]." << std::endl;
+        std::cout << " [failed]. Prediction error: " << err << std::endl;
     }
     else{
         std::cout << " [passed]." << std::endl;

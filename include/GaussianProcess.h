@@ -42,6 +42,24 @@ public:
 
 	typedef std::vector<VectorType> VectorListType;
 	typedef std::vector<MatrixType> MatrixListType;
+
+
+    /*
+     * In the kernel regression method, the kernel matrix has to be inverted. There
+     * are several methods available in the Eigen3 library to invert a matrix. The
+     * standard way to invert a matrix is by the LU decomposition with full pivoting.
+     * it is very fast, but however might by instable. That means, that the inversion
+     * inaccuracy leads to a Gaussian process kernel which is negative definite.
+     * Therefore, with the method SetInversionMethod one can switch between other
+     * inversion methods. These are:
+     *
+     *  - JacobiSVD:    this method is very accurate but for large problems too slow.
+     *  - BDCSVD:       this method is accurate as well, but faster than JacobiSVD.
+     *                  However, compared to FullPivotLU, it is slow as well.
+     *  - SelfAdjointEigenSolver: this method is optimized for symmetric matrices.
+     *                  Good for medium sized problems.
+     */
+    typedef enum { FullPivotLU, JacobiSVD, BDCSVD, SelfAdjointEigenSolver } InversionMethod;
 	
 	/*
 	 * Add a new sample lable pair to the gaussian process
@@ -82,6 +100,7 @@ public:
                                                 m_Initialized(false),
                                                 m_InputDimension(0),
                                                 m_OutputDimension(0),
+                                                m_InvMethod(FullPivotLU),
                                                 debug(false) {
         m_Kernel = kernel;
 	}
@@ -109,6 +128,7 @@ public:
 
     unsigned GetNumberOfInputDimensions() const{ return m_InputDimension; }
 
+    void SetInversionMethod(InversionMethod m){ m_InvMethod = m; }
 
     // IO methods
     void Save(std::string prefix);
@@ -172,6 +192,7 @@ private:
 	bool m_Initialized;
 	unsigned m_InputDimension;
 	unsigned m_OutputDimension;
+    InversionMethod m_InvMethod;
 
 	bool debug;
 

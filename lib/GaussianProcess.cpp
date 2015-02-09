@@ -23,6 +23,7 @@
 namespace fs = boost::filesystem;
 
 #include <Eigen/SVD>
+#include <Eigen/Eigenvalues>
 
 #include "GaussianProcess.h"
 #include "KernelFactory.h"
@@ -97,10 +98,13 @@ TScalarType
 GaussianProcess<TScalarType>::GetCredibleInterval(const typename GaussianProcess<TScalarType>::VectorType& x){
     Initialize();
     CheckInputDimension(x, "GaussianProcess::GetCredibleIntervall: ");
-    TScalarType c = 2*std::sqrt((*this)(x, x));
-    if(std::isnan(c)){
-        throw std::string("GaussianProcess::GetCredibleIntervall: prediction is instable.");
-    }
+
+    // due to nummerical instabilities of the inversion of the kernel matrix
+    // gp(x,x) might return negative values
+    // therefore the maximum of zero and c is taken.
+    TScalarType c = (*this)(x, x);
+    if(debug && c<0) std::cout << "GaussianProcess::GetCredibleIntervall: prediction is instable. gp(x,x) = " << c << "." << std::endl;
+    c = 2*std::sqrt(std::max(static_cast<TScalarType>(0.0),c));
     return c;
 }
 
@@ -446,7 +450,68 @@ void GaussianProcess<TScalarType>::ComputeRegressionVectors(){
     }
 
     // compute core matrix
-    m_CoreMatrix = K.inverse();
+    if(debug){
+        std::cout << "GaussianProcess::ComputeRegressionVectors: inverting kernel matrix... ";
+        std::cout.flush();
+    }
+
+    switch(m_InvMethod){
+
+    // standard method: fast but not that accurate
+    // Uses the LU decomposition with full pivoting for the inversion
+    case FullPivotLU:{
+        if(debug) std::cout << " (inversion method: FullPivotLU) " << std::flush;
+        m_CoreMatrix = K.inverse();
+    }
+    break;
+
+    // very accurate and very slow method, use it for small problems
+    // Uses the two-sided Jacobi SVD decomposition
+    case JacobiSVD:{
+        if(debug) std::cout << " (inversion method: JacobiSVD) " << std::flush;
+        Eigen::JacobiSVD<MatrixType> jacobisvd(K, Eigen::ComputeThinU | Eigen::ComputeThinV);
+        if((jacobisvd.singularValues().real().array() < 0).any() && debug){
+            std::cout << "GaussianProcess::ComputeRegressionVectors: warning: there are negative eigenvalues.";
+            std::cout.flush();
+        }
+        m_CoreMatrix = jacobisvd.matrixV() * VectorType(1/jacobisvd.singularValues().array()).asDiagonal() * jacobisvd.matrixU().transpose();
+    }
+    break;
+
+    // accurate method and faster than Jacobi SVD.
+    // Uses the bidiagonal divide and conquer SVD
+    case BDCSVD:{
+        if(debug) std::cout << " (inversion method: BDCSVD) " << std::flush;
+        Eigen::BDCSVD<MatrixType> bdcsvd(K, Eigen::ComputeThinU | Eigen::ComputeThinV);
+        if((bdcsvd.singularValues().real().array() < 0).any() && debug){
+            std::cout << "GaussianProcess::ComputeRegressionVectors: warning: there are negative eigenvalues.";
+            std::cout.flush();
+        }
+        m_CoreMatrix = bdcsvd.matrixV() * VectorType(1/bdcsvd.singularValues().array()).asDiagonal() * bdcsvd.matrixU().transpose();
+    }
+    break;
+
+    // faster than the SVD method but less stable
+    // computes the eigenvalues/eigenvectors of selfadjoint matrices
+    case SelfAdjointEigenSolver:{
+        if(debug) std::cout << " (inversion method: SelfAdjointEigenSolver) " << std::flush;
+        Eigen::SelfAdjointEigenSolver<MatrixType> es;
+        es.compute(K);
+        VectorType eigenValues = es.eigenvalues().reverse();
+        MatrixType eigenVectors = es.eigenvectors().rowwise().reverse();
+        if((eigenValues.real().array() < 0).any() && debug){
+            std::cout << "GaussianProcess::ComputeRegressionVectors: warning: there are negative eigenvalues.";
+            std::cout.flush();
+        }
+        m_CoreMatrix = eigenVectors * VectorType(1/eigenValues.array()).asDiagonal() * eigenVectors.transpose();
+    }
+    break;
+    }
+    if(debug) std::cout << "[done]" << std::endl;
+
+    if(debug){
+        std::cout << "GaussianProcess::ComputeRegressionVectors: inversion error: " << (K*m_CoreMatrix - MatrixType::Identity(K.rows(),K.cols())).norm() << std::endl;
+    }
     //Eigen::SelfAdjointEigenSolver<MatrixType> es(K);
     //m_CoreMatrix = es.eigenvectors() * VectorType(1.0/VectorType(es.eigenvalues()).array()).asDiagonal() * es.eigenvectors().transpose();
 
@@ -457,12 +522,7 @@ void GaussianProcess<TScalarType>::ComputeRegressionVectors(){
 
 
     // calculate regression vectors
-    if(debug){
-        std::cout << "GaussianProcess::ComputeRegressionVectors: inverting kernel matrix... ";
-        std::cout.flush();
-    }
     m_RegressionVectors = m_CoreMatrix * Y ; // inv(K + sigma)*Y
-    if(debug) std::cout << "[done]" << std::endl;
 }
 
 template< class TScalarType >
