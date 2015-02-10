@@ -1,6 +1,6 @@
 INSTALL(FILES 
 	GaussianProcess.h 
-	Kernels.h
+	Kernel.h
 	KernelFactory.h
 	MatrixIO.h
 DESTINATION

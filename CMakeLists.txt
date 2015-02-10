@@ -4,7 +4,7 @@ project(gaussianprocessregression)
 
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
-FIND_PACKAGE(Boost COMPONENTS system filesystem program_options REQUIRED)
+FIND_PACKAGE(Boost COMPONENTS system filesystem REQUIRED)
 FIND_PACKAGE( Eigen3 REQUIRED )
 
 INCLUDE_DIRECTORIES(
@@ -24,6 +24,7 @@ if(OPENMP_FOUND)
 	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
 endif()
 
+ADD_SUBDIRECTORY(include)
 ADD_SUBDIRECTORY(lib)
 ADD_SUBDIRECTORY(tests)
 
