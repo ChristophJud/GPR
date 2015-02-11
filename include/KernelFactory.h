@@ -74,6 +74,7 @@ public:
         KernelFactory<TScalarType>::AddType< GaussianKernel<TScalarType> >(std::string("GaussianKernel"));
         KernelFactory<TScalarType>::AddType< PeriodicKernel<TScalarType> >(std::string("PeriodicKernel"));
         KernelFactory<TScalarType>::AddType< SumKernel<TScalarType> >(std::string("SumKernel"));
+        KernelFactory<TScalarType>::AddType< ProductKernel<TScalarType> >(std::string("ProductKernel"));
     }
 };
 

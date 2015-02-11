@@ -284,18 +284,30 @@ void GaussianProcess<TScalarType>::Load(std::string prefix){
         KernelTypePointer k = std::dynamic_pointer_cast<KernelType>(KernelFactory<TScalarType>::Load(kernel_type, kernel_parameters));
         m_Kernel = k;
     }
-    else{
-        std::size_t found = kernel_type.find("SumKernel");
-        if(found != std::string::npos){
-            std::string sumkernel;
+    else if(kernel_type.find("SumKernel") != std::string::npos ||
+            kernel_type.find("ProductKernel") != std::string::npos){
+            std::string composition_kernel;
             std::string kernel1;
             std::string kernel2;
 
+            enum Combination {SUM, PROD};
+            Combination combo;
+
             // parse summands
             std::stringstream ss(kernel_type);
-            if(!std::getline(ss, sumkernel, '#') && sumkernel.compare("SumKernel")){
+            if(!std::getline(ss, composition_kernel, '#')){
                 throw std::string("GaussianProcess::Load: failed to tokanize kernel name string");
             }
+            if(composition_kernel.compare("SumKernel")==0){
+                combo = SUM;
+            }
+            else if(composition_kernel.compare("ProductKernel")==0){
+                combo = PROD;
+            }
+            else{
+                throw std::string("GaussianProcess::Load: failed to tokanize kernel name string");
+            }
+
             if(!std::getline(ss, kernel1, '#')){
                 throw std::string("GaussianProcess::Load: failed to tokanize kernel name string");
             }
@@ -303,16 +315,33 @@ void GaussianProcess<TScalarType>::Load(std::string prefix){
                 throw std::string("GaussianProcess::Load: failed to tokanize kernel name string");
             }
 
-            typedef SumKernel<TScalarType>		KernelType;
-            typedef std::shared_ptr<KernelType>     KernelTypePointer;
+            switch(combo){
+            case SUM:{
+                typedef SumKernel<TScalarType>          KernelType;
+                typedef std::shared_ptr<KernelType>     KernelTypePointer;
 
-            KernelTypePointer k = std::dynamic_pointer_cast<KernelType>(KernelFactory<TScalarType>::Load(sumkernel, kernel_parameters));
-            m_Kernel = k;
-        }
-        else{
-            throw std::string("GaussianProcess::Load: kernel not recognized.");
-        }
+                KernelTypePointer k = std::dynamic_pointer_cast<KernelType>(KernelFactory<TScalarType>::Load(composition_kernel, kernel_parameters));
+                m_Kernel = k;
+                break;
+            }
+            case PROD:{
+                typedef ProductKernel<TScalarType>          KernelType;
+                typedef std::shared_ptr<KernelType>     KernelTypePointer;
+
+                KernelTypePointer k = std::dynamic_pointer_cast<KernelType>(KernelFactory<TScalarType>::Load(composition_kernel, kernel_parameters));
+                m_Kernel = k;
+                break;
+            }
+            default:
+                throw std::string("GaussianProcess::Load: failed to recognize kernel composition.");
+            }
+
+
     }
+    else{
+        throw std::string("GaussianProcess::Load: kernel not recognized.");
+    }
+
 
     m_Initialized = true;
 }

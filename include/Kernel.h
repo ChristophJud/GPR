@@ -210,6 +210,107 @@ private:
     void operator=(const Self&); //purposely not implemented
 };
 
+/*
+ * Product Kernel: k(x,y) = k1(x,y) * k2(x,y)
+ */
+template <class TScalarType>
+class ProductKernel : public Kernel<TScalarType>{
+public:
+
+    typedef Kernel<TScalarType> Superclass;
+    typedef typename Superclass::SelfPointer SuperclassPointer;
+    typedef ProductKernel Self;
+    typedef std::shared_ptr<Self> SelfPointer;
+    typedef typename Superclass::VectorType VectorType;
+    typedef typename Superclass::ParameterType ParameterType;
+    typedef typename Superclass::ParameterVectorType ParameterVectorType;
+
+    virtual inline TScalarType operator()(const VectorType & x, const VectorType & y) const{
+
+        //std::cout << "pk: " << (*m_Kernel1)(x, y) << ", gk: " << (*m_Kernel2)(x, y) << ", cpk: " << (*m_Kernel1)(x, y) * (*m_Kernel2)(x, y) << std::endl;
+
+        return (*m_Kernel1)(x, y) * (*m_Kernel2)(x, y);
+    }
+
+    // Constructor takes two kernel pointers
+    // If the parameters are available, it is better to Load
+    // the ProductKernel from the KernelFactory
+    ProductKernel(SuperclassPointer const k1, SuperclassPointer const k2) : Superclass(),
+        k_string1(k1->ToString()),
+        k_string2(k2->ToString()),
+        num_params1(k1->GetParameters().size()),
+        num_params2(k2->GetParameters().size()),
+        m_Kernel1(k1),
+        m_Kernel2(k2){
+
+        // store kernel strings
+        this->m_parameters.push_back(k_string1);
+        this->m_parameters.push_back(k_string2);
+
+        // store number of parameters per kernel
+        // needed to load the full kernel string
+        this->m_parameters.push_back(Self::P2S(num_params1)); // as strings
+        this->m_parameters.push_back(Self::P2S(num_params2));
+
+        // store both parameter vectors of kernel 1 and kernel 2
+        for(ParameterType p : k1->GetParameters()){
+            this->m_parameters.push_back(p);
+        }
+        for(ParameterType p : k2->GetParameters()){
+            this->m_parameters.push_back(p);
+        }
+    }
+    virtual ~ProductKernel() {}
+
+    virtual std::string ToString() const{
+        return "ProductKernel#" + m_Kernel1->ToString() + "#" + m_Kernel2->ToString();
+    }
+
+    // Needed from the KernelFactory to instantiate
+    // a kernel given a parameter vector;
+    static SelfPointer Load(const ParameterVectorType& parameters){
+        if(parameters.size() < 4){
+            throw std::string("ProductKernel::Load: wrong number of kernel parameters.");
+        }
+
+        // read kernel strings
+        std::string ks1 = parameters[0];
+        std::string ks2 = parameters[1];
+
+        // read number of parameters for k1 and k2
+        unsigned np1 = Self::S2P(parameters[2]);
+        unsigned np2 = Self::S2P(parameters[3]);
+
+        // read the parameter vectors into
+        // two separate parameter vectors
+        ParameterVectorType params1;
+        ParameterVectorType params2;
+
+        for(unsigned i=4; i<4+np1; i++){
+            params1.push_back(parameters[i]); // fill up parameters for first kernel
+        }
+
+        for(unsigned i=4+np1; i<4+np1+np2; i++){
+            params2.push_back(parameters[i]); // fill up parameters for second kernel
+        }
+
+        // return a sum kernel where the summands are loaded from the kernel factory
+        return SelfPointer(new Self(KernelFactory<TScalarType>::Load(ks1, params1),
+                        KernelFactory<TScalarType>::Load(ks2, params2)));
+    }
+
+private:
+    const std::string k_string1;
+    const std::string k_string2;
+    const unsigned num_params1;
+    const unsigned num_params2;
+    const SuperclassPointer m_Kernel1;
+    const SuperclassPointer m_Kernel2;
+
+    ProductKernel(const Self&); //purposely not implemented
+    void operator=(const Self&); //purposely not implemented
+};
+
 
 /*
  * Gaussian Kernel: k(x,y) = scale * exp( -0.5||x-y||^2 / sigma^2 )
