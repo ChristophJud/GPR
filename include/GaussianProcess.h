@@ -101,6 +101,7 @@ public:
                                                 m_InputDimension(0),
                                                 m_OutputDimension(0),
                                                 m_InvMethod(FullPivotLU),
+                                                m_EfficientStorage(false),
                                                 debug(false) {
         m_Kernel = kernel;
 	}
@@ -130,6 +131,14 @@ public:
 
     void SetInversionMethod(InversionMethod m){ m_InvMethod = m; }
 
+    // Since for the kernel matrix a lot of memory might be needed,
+    // one can turn on the efficient storage mode, which stores only
+    // the regression vectors. However keep in mind that, if the core matrix has to be
+    // recalculated later, there is a numerical difference between
+    // the matrices.
+    bool GetEfficientStorage(){ return m_EfficientStorage; }
+    void SetEfficientStorage(bool s){ m_EfficientStorage = s; }
+
     // IO methods
     void Save(std::string prefix);
     void Load(std::string prefix);
@@ -153,9 +162,14 @@ private:
     void ComputeKernelMatrix(MatrixType &M) const;
 
     /*
+     * Computation of the core matrix inv(K + sigma I)
+     */
+     void ComputeCoreMatrix(MatrixType &C);
+
+    /*
      * Inversion of the kernel matrix.
      */
-    void InvertKernelMatrix(const MatrixType &K, InversionMethod inv_method);
+    MatrixType InvertKernelMatrix(const MatrixType &K, InversionMethod inv_method);
 
 	/*
 	 * Bring the label vectors in a matrix form Y,
@@ -192,12 +206,13 @@ private:
 	VectorListType m_SampleVectors;  // Dimensionality: TInputDimension
 	VectorListType m_LabelVectors;   // Dimensionality: TOutputDimension
 	MatrixType m_RegressionVectors; // for each output dimension there is one regression vector
-    MatrixType m_CoreMatrix;
+    MatrixType m_CoreMatrix;        // is only compared in the == operator if both have m_EfficientStorage set to false
 	
 	bool m_Initialized;
 	unsigned m_InputDimension;
 	unsigned m_OutputDimension;
     InversionMethod m_InvMethod; // is not saved/loaded
+    bool m_EfficientStorage;
 
 	bool debug;
 

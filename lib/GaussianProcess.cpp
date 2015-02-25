@@ -90,6 +90,10 @@ GaussianProcess<TScalarType>::operator()(const typename GaussianProcess<TScalarT
     ComputeKernelVector(x, Kx);
     VectorType Ky;
     ComputeKernelVector(y, Ky);
+
+    if(m_CoreMatrix.diagonalSize() == 0){
+        ComputeCoreMatrix(m_CoreMatrix);
+    }
     return (*m_Kernel)(x, y) - Kx.adjoint() * m_CoreMatrix * Ky;
 }
 
@@ -144,6 +148,7 @@ void GaussianProcess<TScalarType>::Save(std::string prefix){
     WriteMatrix<MatrixType>(m_RegressionVectors, prefix+"-RegressionVectors.txt");
 
     // save regression vectors
+    if(m_EfficientStorage) m_CoreMatrix.setZero(0,0);
     WriteMatrix<MatrixType>(m_CoreMatrix, prefix+"-CoreMatrix.txt");
 
     // save sample vectors
@@ -172,7 +177,7 @@ void GaussianProcess<TScalarType>::Save(std::string prefix){
         parameter_outfile << kernel_parameters[i] << " ";
     }
 
-    parameter_outfile << m_Sigma << " " << m_InputDimension << " " << m_OutputDimension << " " << debug;
+    parameter_outfile << m_Sigma << " " << m_InputDimension << " " << m_OutputDimension << " " << m_EfficientStorage << " " << debug;
     parameter_outfile.close();
 }
 
@@ -263,6 +268,7 @@ void GaussianProcess<TScalarType>::Load(std::string prefix){
         if(!(line_stream >> m_Sigma &&
              line_stream >> m_InputDimension &&
              line_stream >> m_OutputDimension &&
+             line_stream >> m_EfficientStorage &&
              line_stream >> debug) ||
                 load == false){
             throw std::string("GaussianProcess::Load: parameter file is corrupt");
@@ -376,10 +382,14 @@ bool GaussianProcess<TScalarType>::operator ==(const GaussianProcess<TScalarType
         return false;
     }
 
-    if((this->m_CoreMatrix - b.m_CoreMatrix).norm() > 0){
-        if(this->debug) std::cout << "core matrices not equal." << std::endl;
+    if(this->m_CoreMatrix.diagonalSize() != b.m_CoreMatrix.diagonalSize()){
+        if(this->debug) std::cout << "core matrices not equal."  << std::endl;
         return false;
     }
+    else{
+        if(this->debug) std::cout << "core matrices error is " << (this->m_CoreMatrix - b.m_CoreMatrix).norm() << std::endl;
+    }
+
 
     if(this->m_SampleVectors.size() != b.m_SampleVectors.size()){
         if(this->debug) std::cout << "number of sample vectors not equal." << std::endl;
@@ -422,6 +432,10 @@ bool GaussianProcess<TScalarType>::operator ==(const GaussianProcess<TScalarType
         if(this->debug) std::cout << "output dimension not equal." << std::endl;
         return false;
     }
+    if(this->m_EfficientStorage!= b.m_EfficientStorage){
+        if(this->debug) std::cout << "efficient storage setting not equal." << std::endl;
+        return false;
+    }
     if(this->debug != b.debug){
         if(this->debug) std::cout << "debug state not equal." << std::endl;
         return false;
@@ -432,6 +446,10 @@ bool GaussianProcess<TScalarType>::operator ==(const GaussianProcess<TScalarType
 
 template< class TScalarType >
 void GaussianProcess<TScalarType>::ComputeKernelMatrix(typename GaussianProcess<TScalarType>::MatrixType &M) const{
+    if(debug){
+        std::cout << "GaussianProcess::ComputeKernelMatrix: building kernel matrix... ";
+        std::cout.flush();
+    }
     unsigned n = m_SampleVectors.size();
     M.resize(n,n);
 
@@ -443,23 +461,42 @@ void GaussianProcess<TScalarType>::ComputeKernelMatrix(typename GaussianProcess<
             M(j,i) = v;
         }
     }
+    if(debug) std::cout << "[done]" << std::endl;
 }
 
 template< class TScalarType >
-void GaussianProcess<TScalarType>::InvertKernelMatrix(const typename GaussianProcess<TScalarType>::MatrixType &K,
+void GaussianProcess<TScalarType>::ComputeCoreMatrix(typename GaussianProcess<TScalarType>::MatrixType &C){
+    MatrixType K;
+    ComputeKernelMatrix(K);
+
+    // add noise variance to diagonal
+    for(unsigned i=0; i<K.rows(); i++){
+        K(i,i) += m_Sigma;
+    }
+
+    C = InvertKernelMatrix(K, m_InvMethod);
+
+    if(debug){
+        std::cout << "GaussianProcess::ComputeCoreMatrix: inversion error: " << (K*C - MatrixType::Identity(K.rows(),K.cols())).norm() << std::endl;
+    }
+}
+
+template< class TScalarType >
+typename GaussianProcess<TScalarType>::MatrixType GaussianProcess<TScalarType>::InvertKernelMatrix(const typename GaussianProcess<TScalarType>::MatrixType &K,
                                                       typename GaussianProcess<TScalarType>::InversionMethod inv_method = GaussianProcess<TScalarType>::FullPivotLU){
     // compute core matrix
     if(debug){
         std::cout << "GaussianProcess::InvertKernelMatrix: inverting kernel matrix... ";
         std::cout.flush();
     }
+    typename GaussianProcess<TScalarType>::MatrixType core;
 
     switch(inv_method){
     // standard method: fast but not that accurate
     // Uses the LU decomposition with full pivoting for the inversion
     case FullPivotLU:{
         if(debug) std::cout << " (inversion method: FullPivotLU) " << std::flush;
-        m_CoreMatrix = K.inverse();
+        core = K.inverse();
     }
     break;
 
@@ -472,7 +509,7 @@ void GaussianProcess<TScalarType>::InvertKernelMatrix(const typename GaussianPro
             std::cout << "GaussianProcess::InvertKernelMatrix: warning: there are negative eigenvalues.";
             std::cout.flush();
         }
-        m_CoreMatrix = jacobisvd.matrixV() * VectorType(1/jacobisvd.singularValues().array()).asDiagonal() * jacobisvd.matrixU().transpose();
+        core = jacobisvd.matrixV() * VectorType(1/jacobisvd.singularValues().array()).asDiagonal() * jacobisvd.matrixU().transpose();
     }
     break;
 
@@ -486,7 +523,7 @@ void GaussianProcess<TScalarType>::InvertKernelMatrix(const typename GaussianPro
             std::cout << "GaussianProcess::InvertKernelMatrix: warning: there are negative eigenvalues.";
             std::cout.flush();
         }
-        m_CoreMatrix = bdcsvd.matrixV() * VectorType(1/bdcsvd.singularValues().array()).asDiagonal() * bdcsvd.matrixU().transpose();
+        core = bdcsvd.matrixV() * VectorType(1/bdcsvd.singularValues().array()).asDiagonal() * bdcsvd.matrixU().transpose();
 #else
         // this is checked, since BDCSVD is currently not in the newest release
         throw std::string("GaussianProcess::InvertKernelMatrix: BDCSVD is not supported by the provided Eigen library.");
@@ -507,10 +544,13 @@ void GaussianProcess<TScalarType>::InvertKernelMatrix(const typename GaussianPro
             std::cout << "GaussianProcess::InvertKernelMatrix: warning: there are negative eigenvalues.";
             std::cout.flush();
         }
-        m_CoreMatrix = eigenVectors * VectorType(1/eigenValues.array()).asDiagonal() * eigenVectors.transpose();
+        core = eigenVectors * VectorType(1/eigenValues.array()).asDiagonal() * eigenVectors.transpose();
     }
     break;
     }
+
+    if(debug) std::cout << "[done]" << std::endl;
+    return core;
 }
 
 template< class TScalarType >
@@ -533,25 +573,13 @@ void GaussianProcess<TScalarType>::ComputeRegressionVectors(){
 
     // Computation of kernel matrix
     if(debug){
-        std::cout << "GaussianProcess::ComputeRegressionVectors: building kernel matrix... ";
-        std::cout.flush();
-    }
-    MatrixType K;
-    ComputeKernelMatrix(K);
-    if(debug) std::cout << "[done]" << std::endl;
-
-
-    // add noise variance to diagonal
-    for(unsigned i=0; i<K.rows(); i++){
-        K(i,i) += m_Sigma;
+        std::cout << "GaussianProcess::ComputeRegressionVectors: calculating regression vectors... " << std::endl;
     }
 
-    InvertKernelMatrix(K, m_InvMethod); // sets m_CoreMatrix
-    if(debug) std::cout << "[done]" << std::endl;
-
-    if(debug){
-        std::cout << "GaussianProcess::ComputeRegressionVectors: inversion error: " << (K*m_CoreMatrix - MatrixType::Identity(K.rows(),K.cols())).norm() << std::endl;
-    }
+    // compute the core matrix which is inv(K + sigma I)
+    // This is a separate function call because it is also used if the core matrix
+    // is not stored due to the efficient storage setting
+    ComputeCoreMatrix(m_CoreMatrix);
 
     // calculate label matrix
     // TODO: if a mean support is implemented, the mean has to be subtracted from the labels!
@@ -561,6 +589,16 @@ void GaussianProcess<TScalarType>::ComputeRegressionVectors(){
 
     // calculate regression vectors
     m_RegressionVectors = m_CoreMatrix * Y ; // inv(K + sigma)*Y
+
+    // deleting core matrix if the storage has to be handled efficiently
+    // - it is not used for regression
+    // - but it is needed to compute the credible interval
+    if(m_EfficientStorage){
+        m_CoreMatrix.setZero(0,0);
+    }
+    if(debug){
+        std::cout << "GaussianProcess::ComputeRegressionVectors: calculating regression vectors [done]" << std::endl;
+    }
 }
 
 template< class TScalarType >

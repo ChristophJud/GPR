@@ -82,10 +82,10 @@ void Test1(){
     double sp_err = (sp_m - sp_m_read).norm();
 
     if(sp_err == 0 && dp_err == 0){
-        std::cout << "[passed]." << std::endl;
+        std::cout << "\t\t\t [passed]." << std::endl;
     }
     else{
-        std::cout << "[failed]." << std::endl;
+        std::cout << "\t\t\t [failed]." << std::endl;
     }
 }
 
@@ -121,10 +121,108 @@ void Test2(){
     gp_read->Load("/tmp/gp_io_test-");
 
     if(*gp.get() == *gp_read.get()){
-        std::cout << " [passed]." << std::endl;
+        std::cout << "\t\t\t [passed]." << std::endl;
     }
     else{
-        std::cout << " [failed]." << std::endl;
+        std::cout << "\t\t\t [failed]." << std::endl;
+    }
+}
+
+void Test3(){
+    /*
+     * Test 3: gaussian process save and load with efficient setting
+     *         (core matrix is not saved)
+     */
+    std::cout << "Test 3.1: (efficient) save/load gaussian process... " << std::flush;
+    KernelTypePointer k(new KernelType(std::sqrt(2)));
+    GaussianProcessTypePointer gp(new GaussianProcessType(k));
+    gp->SetSigma(0);
+    if(gp->GetEfficientStorage()){
+        std::cout << "\t [failed]. Efficient storage setting has to be turned off by default." << std::endl;
+        return;
+    }
+    gp->SetEfficientStorage(true);
+
+    unsigned number_of_samples = 10;
+
+    // add training samples
+    for(unsigned i=0; i<number_of_samples; i++){
+        VectorType x(2);
+        x(0) = x(1) = i * 2*M_PI/number_of_samples;
+
+        VectorType y(2);
+        y(0) = std::sin(x(0));
+        y(1) = std::cos(x(1));
+
+        gp->AddSample(x,y);
+    }
+    gp->Initialize();
+
+    // predict a point to compare later
+    VectorType x(2);
+    x(0) = x(1) = 2.56 * 2*M_PI/number_of_samples;
+
+    VectorType yt(2);
+    yt= gp->Predict(x);
+
+    gp->Save("/tmp/gp_io_test-");
+
+    {
+        KernelTypePointer k_dummy(new KernelType(1));
+        GaussianProcessTypePointer gp_read(new GaussianProcessType(k_dummy));
+        gp_read->Load("/tmp/gp_io_test-");
+
+        if(*gp.get() == *gp_read.get() && (yt-gp_read->Predict(x)).norm() < 1e-06){
+            std::cout << "\t [passed]." << std::endl;
+        }
+        else{
+            std::cout << "\t [failed]. Prediction error " << (yt-gp_read->Predict(x)).norm() << std::endl;
+        }
+    }
+
+
+    std::cout << "Test 3.2: (efficient) save/load gaussian process... " << std::flush;
+    {
+        // testing if compare operator works find with the core matrix
+        KernelTypePointer k_dummy(new KernelType(1));
+        GaussianProcessTypePointer gp_read(new GaussianProcessType(k_dummy));
+        gp_read->Load("/tmp/gp_io_test-");
+
+        float c = (*gp_read)(x, x); // core matrix should be built
+        if(*gp.get() == *gp_read.get()){
+            std::cout << "\t [failed]. Comparison with late core matrix construction not right." << std::endl;
+            return;
+        }
+        c = (*gp)(x, x); // now the core matrix of gp should be built as well
+        if(*gp.get() != *gp_read.get()){
+            std::cout << "\t [failed]. Comparison with late core matrix construction not right." << std::endl;
+            return;
+        }
+
+        if((yt-gp_read->Predict(x)).norm() < 1e-06){
+            std::cout << " \t [passed]." << std::endl;
+        }
+        else{
+            std::cout << "\t [failed]. Prediction error is " << (yt-gp_read->Predict(x)).norm()  << std::endl;
+        }
+    }
+
+    std::cout << "Test 3.3: (efficient) save/load gaussian process... " << std::flush;
+    {
+        float c = (*gp)(x, x); // ensure that core matrix is built
+        gp->Save("/tmp/gp_io_test-");
+
+
+        KernelTypePointer k_dummy(new KernelType(1));
+        GaussianProcessTypePointer gp_read(new GaussianProcessType(k_dummy));
+        gp_read->Load("/tmp/gp_io_test-");
+
+        if(*gp.get() == *gp_read.get() && (yt-gp_read->Predict(x)).norm() < 1e-06){
+            std::cout << " \t [passed]." << std::endl;
+        }
+        else{
+            std::cout << "\t [failed]. Prediction error is " << (yt-gp_read->Predict(x)).norm()  << std::endl;
+        }
     }
 }
 
@@ -133,6 +231,7 @@ int main (int argc, char *argv[]){
     std::cout << "Input/Output test:" << std::endl;
     Test1();
     Test2();
+    Test3();
 
     return 0;
 }
