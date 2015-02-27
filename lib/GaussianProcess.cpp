@@ -387,7 +387,7 @@ bool GaussianProcess<TScalarType>::operator ==(const GaussianProcess<TScalarType
         return false;
     }
     else{
-        if(this->debug) std::cout << "core matrices error is " << (this->m_CoreMatrix - b.m_CoreMatrix).norm() << std::endl;
+        if(this->debug && (this->m_CoreMatrix - b.m_CoreMatrix).norm() > 0) std::cout << "core matrices error is " << (this->m_CoreMatrix - b.m_CoreMatrix).norm() << std::endl;
     }
 
 
