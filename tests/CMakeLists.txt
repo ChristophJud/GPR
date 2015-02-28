@@ -6,6 +6,7 @@ SET(cpk_lib_src ProductKernelTest.cpp )
 SET(sc_lib_src ScopeTest.cpp )
 SET(pp_lib_src PosteriorProcessTest.cpp )
 SET(im_lib_src InversionMethodsTest.cpp )
+SET(pe_lib_src ParameterEstimate.cpp )
 
 ADD_EXECUTABLE(gpTest ${gp_lib_src})
 ADD_EXECUTABLE(ioTest ${io_lib_src})
@@ -15,6 +16,7 @@ ADD_EXECUTABLE(cpkTest ${cpk_lib_src})
 ADD_EXECUTABLE(scTest ${sc_lib_src})
 ADD_EXECUTABLE(ppTest ${pp_lib_src})
 ADD_EXECUTABLE(imTest ${im_lib_src})
+ADD_EXECUTABLE(peTest ${pe_lib_src})
 
 TARGET_LINK_LIBRARIES( gpTest gplib)
 TARGET_LINK_LIBRARIES( ioTest gplib)
@@ -24,6 +26,7 @@ TARGET_LINK_LIBRARIES( cpkTest gplib)
 TARGET_LINK_LIBRARIES( scTest gplib)
 TARGET_LINK_LIBRARIES( ppTest gplib)
 TARGET_LINK_LIBRARIES( imTest gplib)
+TARGET_LINK_LIBRARIES( peTest gplib)
 
 SET_TARGET_PROPERTIES(gpTest PROPERTIES OUTPUT_NAME gpTest)
 SET_TARGET_PROPERTIES(ioTest PROPERTIES OUTPUT_NAME ioTest)
@@ -33,6 +36,7 @@ SET_TARGET_PROPERTIES(cpkTest PROPERTIES OUTPUT_NAME cpkTest)
 SET_TARGET_PROPERTIES(scTest PROPERTIES OUTPUT_NAME scTest)
 SET_TARGET_PROPERTIES(ppTest PROPERTIES OUTPUT_NAME ppTest)
 SET_TARGET_PROPERTIES(imTest PROPERTIES OUTPUT_NAME imTest)
+SET_TARGET_PROPERTIES(peTest PROPERTIES OUTPUT_NAME peTest)
 
 INSTALL(TARGETS
 	gpTest
@@ -43,5 +47,6 @@ INSTALL(TARGETS
 	scTest
 	ppTest
 	imTest
+	peTest
 RUNTIME DESTINATION bin)
 
