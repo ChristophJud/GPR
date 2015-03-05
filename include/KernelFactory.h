@@ -78,7 +78,7 @@ public:
         KernelFactory<TScalarType>::AddType< ProductKernel<TScalarType> >(std::string("ProductKernel"));
     }
 
-
+    // Loads/Builds a kernel out of a kernel string
     static KernelTypePointer GetKernel(std::string& kernel_string){
 
         // get kernel name
@@ -112,7 +112,7 @@ public:
             KernelTypePointer k1 = GetKernel(kernel_string);
 
             int pos = kernel_string.find("),");
-            if(pos == std::string::npos) throw std::string("KernelFactory::GetKernel: failed to tokanize  sum kernel name string");
+            if(pos == std::string::npos) throw std::string("KernelFactory::GetKernel: failed to tokanize  product kernel name string");
             kernel_string = kernel_string.substr(pos+2);
 
             KernelTypePointer k2 = GetKernel(kernel_string);
@@ -167,6 +167,7 @@ public:
             return k;
         }
 
+        throw std::string("KernelFactory::GetKernel: failed to load kernel.");
     }
 };
 

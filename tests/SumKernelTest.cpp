@@ -110,7 +110,7 @@ void Test1(){
     }
 
     T err = (y-y_predict).norm();
-    if(err>3){
+    if(err>3.3){
         std::cout << " [failed]." << std::endl;
     }
     else{
