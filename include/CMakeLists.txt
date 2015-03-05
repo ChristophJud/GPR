@@ -3,6 +3,7 @@ INSTALL(FILES
 	Kernel.h
 	KernelFactory.h
 	MatrixIO.h
+	Likelihood.h
 DESTINATION
 	include
 PERMISSIONS

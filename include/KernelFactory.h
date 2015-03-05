@@ -15,8 +15,7 @@
  *
  */
 
-#ifndef KernelFactory_h
-#define KernelFactory_h
+#pragma once
 
 #include <map>
 #include <string>
@@ -71,12 +70,106 @@ public:
     }
 
     static void RegisterKernels(){
+        KernelFactory<TScalarType>::AddType< WhiteKernel<TScalarType> >(std::string("WhiteKernel"));
         KernelFactory<TScalarType>::AddType< GaussianKernel<TScalarType> >(std::string("GaussianKernel"));
         KernelFactory<TScalarType>::AddType< PeriodicKernel<TScalarType> >(std::string("PeriodicKernel"));
+        KernelFactory<TScalarType>::AddType< RationalQuadraticKernel<TScalarType> >(std::string("RationalQuadraticKernel"));
         KernelFactory<TScalarType>::AddType< SumKernel<TScalarType> >(std::string("SumKernel"));
         KernelFactory<TScalarType>::AddType< ProductKernel<TScalarType> >(std::string("ProductKernel"));
     }
+
+
+    static KernelTypePointer GetKernel(std::string& kernel_string){
+
+        // get kernel name
+        std::stringstream line_stream(kernel_string);
+        std::string kernel_type;
+
+        if(!std::getline(line_stream, kernel_type, '(')){
+            throw std::string("KernelFactory::GetKernel: failed to tokanize kernel name string");
+        }
+
+        if(kernel_type.compare("SumKernel")==0){
+            kernel_string = kernel_string.substr(std::string("SumKernel(").size());
+
+            KernelTypePointer k1 = GetKernel(kernel_string);
+
+            int pos = kernel_string.find("),");
+            if(pos == std::string::npos) throw std::string("KernelFactory::GetKernel: failed to tokanize  sum kernel name string");
+            kernel_string = kernel_string.substr(pos+2);
+
+            KernelTypePointer k2 = GetKernel(kernel_string);
+
+            typedef SumKernel<TScalarType>          KernelType;
+            typedef std::shared_ptr<KernelType>     KernelTypePointer;
+            KernelTypePointer k(new KernelType(k1,k2));
+            return k;
+        }
+
+        if(kernel_type.compare("ProductKernel")==0){
+            kernel_string = kernel_string.substr(std::string("ProductKernel(").size());
+
+            KernelTypePointer k1 = GetKernel(kernel_string);
+
+            int pos = kernel_string.find("),");
+            if(pos == std::string::npos) throw std::string("KernelFactory::GetKernel: failed to tokanize  sum kernel name string");
+            kernel_string = kernel_string.substr(pos+2);
+
+            KernelTypePointer k2 = GetKernel(kernel_string);
+
+            typedef ProductKernel<TScalarType>          KernelType;
+            typedef std::shared_ptr<KernelType>     KernelTypePointer;
+            KernelTypePointer k(new KernelType(k1,k2));
+            return k;
+        }
+
+
+        // get kernel parameters
+        typename KernelType::ParameterVectorType kernel_parameters;
+        do{
+            typename KernelType::ParameterType p;
+            if(std::getline(line_stream, p, ',')){
+                if(p.find(")") != std::string::npos) break;
+                kernel_parameters.push_back(p);
+            }
+            else{
+                break;
+            }
+        }while(true);
+
+
+        if(kernel_type.compare("GaussianKernel")==0){
+            typedef GaussianKernel<TScalarType>		KernelType;
+            typedef std::shared_ptr<KernelType>     KernelTypePointer;
+
+            KernelTypePointer k = std::dynamic_pointer_cast<KernelType>(KernelFactory<TScalarType>::Load(kernel_type, kernel_parameters));
+            return k;
+        }
+        else if(kernel_type.compare("PeriodicKernel")==0){
+            typedef PeriodicKernel<TScalarType>		KernelType;
+            typedef std::shared_ptr<KernelType>     KernelTypePointer;
+
+            KernelTypePointer k = std::dynamic_pointer_cast<KernelType>(KernelFactory<TScalarType>::Load(kernel_type, kernel_parameters));
+            return k;
+        }
+        else if(kernel_type.compare("RationalQuadraticKernel")==0){
+            typedef RationalQuadraticKernel<TScalarType>		KernelType;
+            typedef std::shared_ptr<KernelType>                 KernelTypePointer;
+
+            KernelTypePointer k = std::dynamic_pointer_cast<KernelType>(KernelFactory<TScalarType>::Load(kernel_type, kernel_parameters));
+            return k;
+        }
+        else if(kernel_type.compare("WhiteKernel")==0){
+            typedef WhiteKernel<TScalarType>		KernelType;
+            typedef std::shared_ptr<KernelType>     KernelTypePointer;
+
+            KernelTypePointer k = std::dynamic_pointer_cast<KernelType>(KernelFactory<TScalarType>::Load(kernel_type, kernel_parameters));
+            return k;
+        }
+
+    }
 };
+
 
 //template<> KernelFactory<float>::MapTyp KernelFactory<float>::m_Map();
 
@@ -88,4 +181,3 @@ template class KernelFactory<double>;
 
 }
 
-#endif

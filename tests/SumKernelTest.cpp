@@ -109,7 +109,7 @@ void Test1(){
         y_predict[i] = gp->Predict(x)(0);
     }
 
-    double err = (y-y_predict).norm();
+    T err = (y-y_predict).norm();
     if(err>3){
         std::cout << " [failed]." << std::endl;
     }

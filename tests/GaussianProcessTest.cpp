@@ -318,72 +318,6 @@ void Test6(){
     std::cout << "[done]. Prediction error: " << err << std::endl;
 }
 
-void Test7(){
-	/*
-	 * Test 7: vectorial input and scalar output
-	 * - try to learn derivative function over some 2D landmarks
-	 */
-	KernelTypePointer k(new KernelType(1));
-		GaussianProcessTypePointer gp(new GaussianProcessType(k));
-		gp->SetSigma(0.001);
-
-		{
-			VectorType x(2);
-			x(0) = 0;
-			x(1) = 0;
-			VectorType y(1);
-			y(0) = 10;
-
-			gp->AddSample(x,y);
-		}
-
-		{
-			VectorType x(2);
-			x(0) = 5;
-			x(1) = 0;
-			VectorType y(1);
-			y(0) = 3;
-
-			gp->AddSample(x,y);
-		}
-
-		{
-			VectorType x(2);
-			x(0) = 5;
-			x(1) = 8;
-			VectorType y(1);
-			y(0) = 3;
-
-			gp->AddSample(x,y);
-		}
-
-		{
-			VectorType x(2);
-			x(0) = 3;
-			x(1) = 5;
-			VectorType y(1);
-			y(0) = 5;
-
-			gp->AddSample(x,y);
-		}
-
-		gp->Initialize();
-
-
-		std::cout << "Predictions: " << std::endl;
-		unsigned number_of_tests = 50;
-		for(unsigned i=0; i<number_of_tests; i++){
-			for(unsigned j=0; j<number_of_tests; j++){
-				VectorType x(2);
-				x(0) = double(i)/8;
-				x(1) = double(j)/8;
-				MatrixType D;
-				VectorType v = gp->PredictDerivative(x,D);
-				std::cout << D << std::endl << std::endl;
-				//std::cout << v << ',';
-			}
-		}
-}
 
 int main (int argc, char *argv[]){
     std::cout << "Gaussian process regression test: " << std::endl;
@@ -393,7 +327,7 @@ int main (int argc, char *argv[]){
     Test4();
     Test5();
     Test6();
-    //Test7(); // todo
+
 
 	return 0;
 }

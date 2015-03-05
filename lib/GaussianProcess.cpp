@@ -170,16 +170,14 @@ void GaussianProcess<TScalarType>::Save(std::string prefix){
     std::ofstream parameter_outfile;
     parameter_outfile.open(std::string(prefix+"-ParameterFile.txt").c_str());
 
-    parameter_outfile << std::setprecision(std::numeric_limits<TScalarType>::digits10 +1);
-    typename KernelType::ParameterVectorType kernel_parameters = m_Kernel->GetParameters();
-    parameter_outfile << m_Kernel->ToString() << " " << kernel_parameters.size() << " ";
-    for(unsigned i=0; i<kernel_parameters.size(); i++){
-        parameter_outfile << kernel_parameters[i] << " ";
-    }
+    parameter_outfile << m_Sigma << " " << m_InputDimension << " " << m_OutputDimension << " " << m_EfficientStorage << " " << debug << " ";
 
-    parameter_outfile << m_Sigma << " " << m_InputDimension << " " << m_OutputDimension << " " << m_EfficientStorage << " " << debug;
+    parameter_outfile << std::setprecision(std::numeric_limits<TScalarType>::digits10 +1);
+    parameter_outfile << m_Kernel->ToString();
+
     parameter_outfile.close();
 }
+
 
 template< class TScalarType >
 void GaussianProcess<TScalarType>::Load(std::string prefix){
@@ -241,30 +239,12 @@ void GaussianProcess<TScalarType>::Load(std::string prefix){
     std::ifstream parameter_infile;
     parameter_infile.open( pf_filename.c_str() );
 
-    std::string kernel_type;
-    unsigned num_kernel_parameters = 0;
-    typename KernelType::ParameterVectorType kernel_parameters;
-
     // reading parameter file
     std::string line;
     bool load = true;
     if(std::getline(parameter_infile, line)) {
         std::stringstream line_stream(line);
-        if(!(line_stream >> kernel_type)){
-            load = false;
-        }
-        if(!(line_stream >> num_kernel_parameters)){
-            load = false;
-        }
-        for(unsigned p=0; p<num_kernel_parameters; p++){
-            typename KernelType::ParameterType param;
-            if(!(line_stream >> param)){
-                load = false;
-            }
-            else{
-                kernel_parameters.push_back(param);
-            }
-        }
+
         if(!(line_stream >> m_Sigma &&
              line_stream >> m_InputDimension &&
              line_stream >> m_OutputDimension &&
@@ -273,80 +253,14 @@ void GaussianProcess<TScalarType>::Load(std::string prefix){
                 load == false){
             throw std::string("GaussianProcess::Load: parameter file is corrupt");
         }
+
+        std::string kernel_string;
+        line_stream >> kernel_string;
+
+        m_Kernel = KernelFactory<TScalarType>::GetKernel(kernel_string);
+
     }
     parameter_infile.close();
-
-    if(kernel_type.compare("GaussianKernel")==0){
-        typedef GaussianKernel<TScalarType>		KernelType;
-        typedef std::shared_ptr<KernelType>     KernelTypePointer;
-
-        KernelTypePointer k = std::dynamic_pointer_cast<KernelType>(KernelFactory<TScalarType>::Load(kernel_type, kernel_parameters));
-        m_Kernel = k;
-    }
-    else if(kernel_type.compare("PeriodicKernel")==0){
-        typedef PeriodicKernel<TScalarType>		KernelType;
-        typedef std::shared_ptr<KernelType>     KernelTypePointer;
-
-        KernelTypePointer k = std::dynamic_pointer_cast<KernelType>(KernelFactory<TScalarType>::Load(kernel_type, kernel_parameters));
-        m_Kernel = k;
-    }
-    else if(kernel_type.find("SumKernel") != std::string::npos ||
-            kernel_type.find("ProductKernel") != std::string::npos){
-            std::string composition_kernel;
-            std::string kernel1;
-            std::string kernel2;
-
-            enum Combination {SUM, PROD};
-            Combination combo;
-
-            // parse summands
-            std::stringstream ss(kernel_type);
-            if(!std::getline(ss, composition_kernel, '#')){
-                throw std::string("GaussianProcess::Load: failed to tokanize kernel name string");
-            }
-            if(composition_kernel.compare("SumKernel")==0){
-                combo = SUM;
-            }
-            else if(composition_kernel.compare("ProductKernel")==0){
-                combo = PROD;
-            }
-            else{
-                throw std::string("GaussianProcess::Load: failed to tokanize kernel name string");
-            }
-
-            if(!std::getline(ss, kernel1, '#')){
-                throw std::string("GaussianProcess::Load: failed to tokanize kernel name string");
-            }
-            if(!std::getline(ss, kernel2, '#')){
-                throw std::string("GaussianProcess::Load: failed to tokanize kernel name string");
-            }
-
-            switch(combo){
-            case SUM:{
-                typedef SumKernel<TScalarType>          KernelType;
-                typedef std::shared_ptr<KernelType>     KernelTypePointer;
-
-                KernelTypePointer k = std::dynamic_pointer_cast<KernelType>(KernelFactory<TScalarType>::Load(composition_kernel, kernel_parameters));
-                m_Kernel = k;
-                break;
-            }
-            case PROD:{
-                typedef ProductKernel<TScalarType>          KernelType;
-                typedef std::shared_ptr<KernelType>     KernelTypePointer;
-
-                KernelTypePointer k = std::dynamic_pointer_cast<KernelType>(KernelFactory<TScalarType>::Load(composition_kernel, kernel_parameters));
-                m_Kernel = k;
-                break;
-            }
-            default:
-                throw std::string("GaussianProcess::Load: failed to recognize kernel composition.");
-            }
-
-
-    }
-    else{
-        throw std::string("GaussianProcess::Load: kernel not recognized.");
-    }
 
 
     m_Initialized = true;
@@ -465,7 +379,7 @@ void GaussianProcess<TScalarType>::ComputeKernelMatrix(typename GaussianProcess<
 }
 
 template< class TScalarType >
-void GaussianProcess<TScalarType>::ComputeCoreMatrix(typename GaussianProcess<TScalarType>::MatrixType &C){
+TScalarType GaussianProcess<TScalarType>::ComputeCoreMatrix(typename GaussianProcess<TScalarType>::MatrixType &C){
     MatrixType K;
     ComputeKernelMatrix(K);
 
@@ -479,6 +393,7 @@ void GaussianProcess<TScalarType>::ComputeCoreMatrix(typename GaussianProcess<TS
     if(debug){
         std::cout << "GaussianProcess::ComputeCoreMatrix: inversion error: " << (K*C - MatrixType::Identity(K.rows(),K.cols())).norm() << std::endl;
     }
+    return K.determinant();
 }
 
 template< class TScalarType >
@@ -489,6 +404,7 @@ typename GaussianProcess<TScalarType>::MatrixType GaussianProcess<TScalarType>::
         std::cout << "GaussianProcess::InvertKernelMatrix: inverting kernel matrix... ";
         std::cout.flush();
     }
+
     typename GaussianProcess<TScalarType>::MatrixType core;
 
     switch(inv_method){

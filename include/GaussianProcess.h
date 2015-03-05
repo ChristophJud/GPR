@@ -15,8 +15,7 @@
  *
  */
 
-#ifndef GaussianProcess_h
-#define GaussianProcess_h
+#pragma once
 
 #include <string>
 #include <vector>
@@ -27,6 +26,7 @@
 #include "Kernel.h"
 
 namespace gpr{
+template <class TScalarType> class Likelihood;
 
 template< class TScalarType >
 class GaussianProcess
@@ -108,6 +108,11 @@ public:
 
     virtual ~GaussianProcess() {}
 
+    const KernelTypePointer GetKernel() { return m_Kernel; }
+    void SetKernel(KernelTypePointer k) {
+        m_Kernel = k;
+        m_Initialized = false;
+    }
 
     // Some get / set methods
 	void DebugOn(){
@@ -163,8 +168,9 @@ private:
 
     /*
      * Computation of the core matrix inv(K + sigma I)
+     * it returns the determinant of K + sigma I just in case if it is needed
      */
-     void ComputeCoreMatrix(MatrixType &C);
+     TScalarType ComputeCoreMatrix(MatrixType &C);
 
     /*
      * Inversion of the kernel matrix.
@@ -218,8 +224,9 @@ private:
 
 	GaussianProcess(const Self &); //purposely not implemented
 	void operator=(const Self &); //purposely not implemented
+
+    friend class Likelihood<TScalarType>;
 };
 
 }
-
-#endif
+#include "Likelihood.h"
