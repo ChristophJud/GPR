@@ -319,6 +319,33 @@ void Test6(){
 }
 
 
+void Test7(){
+    /*
+     * Test 7: is a zero sigma possible in the gaussian kernel?
+     */
+    std::cout << "Test 7: zero gaussian sigma test..." << std::flush;
+    KernelTypePointer k(new KernelType(0));
+
+    VectorType x(1);
+    x(0) = 3.4;
+    VectorType y(1);
+    y(0) = 2.8;
+
+    try{
+        double val = (*k)(x,y);
+        if(val == 0){
+            std::cout << "[passed]" << std::endl;
+        }
+        else{
+            std::cout << "[failed]" << std::endl;
+        }
+    }
+    catch(...){
+        std::cout << "[failed]" << std::endl;
+    }
+
+}
+
 int main (int argc, char *argv[]){
     std::cout << "Gaussian process regression test: " << std::endl;
     Test1();
@@ -327,7 +354,7 @@ int main (int argc, char *argv[]){
     Test4();
     Test5();
     Test6();
-
+    Test7();
 
 	return 0;
 }

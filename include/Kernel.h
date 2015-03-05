@@ -318,7 +318,7 @@ private:
 
 
 /*
- * Gaussian Kernel: k(x,y) = scale * exp( -0.5||x-y||^2 / sigma^2 )
+ * Gaussian Kernel: k(x,y) = scale^2 * exp( -0.5||x-y||^2 / sigma^2 )
  *
  * - sigma is a smoothness parameter
  * - scale is the expected amplitude
@@ -342,10 +342,10 @@ public:
     // with scalars or with strings (ParameterType)
     GaussianKernel(TScalarType sigma, TScalarType scale=1) : Superclass(),
             m_Sigma(sigma),
-            m_Scale(scale) {
+            m_Scale(scale*scale) {
 
         this->m_parameters.push_back(Self::P2S(m_Sigma));
-        this->m_parameters.push_back(Self::P2S(m_Scale));
+        this->m_parameters.push_back(Self::P2S(scale));
 	}
     GaussianKernel(const typename Superclass::ParameterType& p1,
                    const typename Superclass::ParameterType& p2) :
@@ -377,7 +377,7 @@ private:
 
 
 /*
- * White Kernel: k(x,y) = scale * delta
+ * White Kernel: k(x,y) = scale^2 * delta
  *
  * - scale is the expected amplitude
  * - only not zero if x==y
@@ -404,8 +404,8 @@ public:
     // for convenience the constructor can be called
     // with scalars or with strings (ParameterType)
     WhiteKernel(TScalarType scale) : Superclass(),
-            m_Scale(scale) {
-        this->m_parameters.push_back(Self::P2S(m_Scale));
+            m_Scale(scale*scale) {
+        this->m_parameters.push_back(Self::P2S(scale));
     }
     WhiteKernel(const typename Superclass::ParameterType& p1) :
         WhiteKernel(Self::S2P(p1)){
@@ -435,7 +435,7 @@ private:
 
 
 /*
- * Rational Quadratic Kernel: k(x,y) = scale * pow( 1 + ||x-y||^2 / ( 2 * alpha * sigma^2), -alpha )
+ * Rational Quadratic Kernel: k(x,y) = scale^2 * pow( 1 + ||x-y||^2 / ( 2 * alpha * sigma^2), -alpha )
  *
  * - sigma is a smoothness parameter
  * - scale is the expected amplitude
@@ -453,17 +453,17 @@ public:
 
     virtual inline TScalarType operator()(const VectorType & x, const VectorType & y) const{
         TScalarType exponent = (x-y).norm()/m_Sigma;
-        return m_Scale * std::pow(1 + 0.5*(exponent*exponent)/m_Alpha, -m_Alpha);
+        return m_Scale * std::pow(1 + 0.5*(exponent*exponent)/m_Alpha, - m_Alpha);
     }
 
     // for convenience the constructor can be called
     // with scalars or with strings (ParameterType)
     RationalQuadraticKernel(TScalarType scale, TScalarType sigma, TScalarType alpha) : Superclass(),
-        m_Scale(scale),
+        m_Scale(scale*scale),
         m_Sigma(sigma),
         m_Alpha(alpha){
 
-        this->m_parameters.push_back(Self::P2S(m_Scale));
+        this->m_parameters.push_back(Self::P2S(scale));
         this->m_parameters.push_back(Self::P2S(m_Sigma));
         this->m_parameters.push_back(Self::P2S(m_Alpha));
     }
@@ -498,7 +498,7 @@ private:
 };
 
 /*
- * Periodic Kernel: k(x,y) = alpha exp( -0.5 sum_d=1^D sin(b(x_d-y_d))/sigma_d)^2 )
+ * Periodic Kernel: k(x,y) = scale^2 exp( -0.5 sum_d=1^D sin(b(x_d-y_d))/sigma_d)^2 )
  *
  * - D is the number of input dimensions
  * - b is determined as follows: pi/b is the period length
@@ -522,18 +522,18 @@ public:
             sum += f*f;
         }
 
-        return m_Alpha * std::exp(-0.5*sum);
+        return m_Scale * std::exp(-0.5*sum);
     }
 
-    PeriodicKernel(TScalarType alpha,
+    PeriodicKernel(TScalarType scale,
                    TScalarType b,
                    TScalarType sigma) : Superclass(),
-            m_Alpha(alpha),
+            m_Scale(scale*scale),
             m_B(b),
             m_Sigma(sigma)
             {
 
-        this->m_parameters.push_back(Self::P2S(m_Alpha));
+        this->m_parameters.push_back(Self::P2S(scale));
         this->m_parameters.push_back(Self::P2S(m_B));
         this->m_parameters.push_back(Self::P2S(m_Sigma));
     }
@@ -558,7 +558,7 @@ public:
         return SelfPointer(new Self(Self::S2P(parameters[0]), Self::S2P(parameters[1]), Self::S2P(parameters[2])));
     }
 private:
-    TScalarType m_Alpha;
+    TScalarType m_Scale;
     TScalarType m_B;
     TScalarType m_Sigma;
 
