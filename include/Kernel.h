@@ -45,9 +45,15 @@ public:
     typedef std::string ParameterType;
     typedef std::vector<ParameterType> ParameterVectorType;
 
+
     virtual inline TScalarType operator()(const VectorType & x, const VectorType & y) const{
-		throw std::string("Kernel: operator() is not implemented.");
-	}
+        throw std::string("Kernel: operator() is not implemented.");
+    }
+
+    // can be calculated with http://www.derivative-calculator.net/
+    virtual inline VectorType GetDerivative(const VectorType & x, const VectorType & y) const{
+        throw std::string("Kernel: GetDerivative() is not implemented.");
+    }
 
     virtual std::string ToString() const = 0;
 
@@ -137,6 +143,17 @@ public:
 
     virtual inline TScalarType operator()(const VectorType & x, const VectorType & y) const{
         return (*m_Kernel1)(x, y) + (*m_Kernel2)(x, y);
+    }
+
+    virtual inline VectorType GetDerivative(const VectorType & x, const VectorType & y) const{
+        VectorType D1 = m_Kernel1->GetDerivative(x,y);
+        VectorType D2 = m_Kernel2->GetDerivative(x,y);
+        VectorType D = VectorType::Zero(D1.rows() + D2.rows());
+
+        D.topRows(D1.rows()) = D1;
+        D.bottomRows(D2.rows()) = D2;
+
+        return D;
     }
 
     // Constructor takes two kernel pointers
@@ -237,6 +254,17 @@ public:
         return (*m_Kernel1)(x, y) * (*m_Kernel2)(x, y);
     }
 
+    virtual inline VectorType GetDerivative(const VectorType & x, const VectorType & y) const{
+        VectorType D1 = m_Kernel1->GetDerivative(x,y);
+        VectorType D2 = m_Kernel2->GetDerivative(x,y);
+        VectorType D = VectorType::Zero(D1.rows() + D2.rows());
+
+        D.topRows(D1.rows()) = D1 * (*m_Kernel2)(x,y);
+        D.bottomRows(D2.rows()) = D2 * (*m_Kernel1)(x,y);
+
+        return D;
+    }
+
     // Constructor takes two kernel pointers
     // If the parameters are available, it is better to Load
     // the ProductKernel from the KernelFactory
@@ -334,18 +362,31 @@ public:
     typedef typename Superclass::ParameterVectorType ParameterVectorType;
 
     virtual inline TScalarType operator()(const VectorType & x, const VectorType & y) const{
-        TScalarType exponent = (x-y).norm()/m_Sigma;
-        return m_Scale * std::exp(-0.5*(exponent*exponent));
+        TScalarType r = (x-y).norm();
+        return m_Scale2 * std::exp(-0.5 * (r*r) / (m_Sigma2));
 	}
+
+    virtual inline VectorType GetDerivative(const VectorType & x, const VectorType & y) const{
+        VectorType D = VectorType::Zero(2);
+
+        TScalarType r = (x-y).norm();
+        TScalarType f = std::exp(-0.5 * (r*r) / (m_Sigma2));
+        D[0] = m_Scale2 * (r*r) / (m_Sigma3) * f;
+        D[1] = 2*m_Scale * f;
+        return D;
+    }
 
     // for convenience the constructor can be called
     // with scalars or with strings (ParameterType)
     GaussianKernel(TScalarType sigma, TScalarType scale=1) : Superclass(),
             m_Sigma(sigma),
-            m_Scale(scale*scale) {
+            m_Scale(scale),
+            m_Sigma2(sigma*sigma),
+            m_Sigma3(sigma*sigma*sigma),
+            m_Scale2(scale*scale){
 
         this->m_parameters.push_back(Self::P2S(m_Sigma));
-        this->m_parameters.push_back(Self::P2S(scale));
+        this->m_parameters.push_back(Self::P2S(m_Scale));
 	}
     GaussianKernel(const typename Superclass::ParameterType& p1,
                    const typename Superclass::ParameterType& p2) :
@@ -370,6 +411,10 @@ public:
 private:
     TScalarType m_Sigma;
     TScalarType m_Scale;
+
+    TScalarType m_Sigma2;
+    TScalarType m_Sigma3;
+    TScalarType m_Scale2;
 	
 	GaussianKernel(const Self&); //purposely not implemented
     void operator=(const Self&); //purposely not implemented
@@ -394,17 +439,29 @@ public:
 
     virtual inline TScalarType operator()(const VectorType & x, const VectorType & y) const{
         if((x-y).norm() == 0){
-            return m_Scale;
+            return m_Scale2;
         }
         else{
             return 0;
         }
     }
 
+    virtual inline VectorType GetDerivative(const VectorType & x, const VectorType & y) const{
+        VectorType D = VectorType::Zero(1);
+        if((x-y).norm() == 0){
+            D[0] = 2*m_Scale;
+        }
+        else{
+            D[0] = 0;
+        }
+        return D;
+    }
+
     // for convenience the constructor can be called
     // with scalars or with strings (ParameterType)
     WhiteKernel(TScalarType scale) : Superclass(),
-            m_Scale(scale*scale) {
+            m_Scale(scale),
+            m_Scale2(scale*scale){
         this->m_parameters.push_back(Self::P2S(scale));
     }
     WhiteKernel(const typename Superclass::ParameterType& p1) :
@@ -428,6 +485,7 @@ public:
 
 private:
     TScalarType m_Scale;
+    TScalarType m_Scale2;
 
     WhiteKernel(const Self&); //purposely not implemented
     void operator=(const Self&); //purposely not implemented
@@ -452,18 +510,32 @@ public:
     typedef typename Superclass::ParameterVectorType ParameterVectorType;
 
     virtual inline TScalarType operator()(const VectorType & x, const VectorType & y) const{
-        TScalarType exponent = (x-y).norm()/m_Sigma;
-        return m_Scale * std::pow(1 + 0.5*(exponent*exponent)/m_Alpha, - m_Alpha);
+        TScalarType r = (x-y).norm();
+        return m_Scale2 * std::pow(1 + 0.5*(r*r)/(m_Sigma2 * m_Alpha), - m_Alpha);
+    }
+
+    virtual inline VectorType GetDerivative(const VectorType & x, const VectorType & y) const{
+        VectorType D = VectorType::Zero(3);
+
+        TScalarType r = (x-y).norm();
+        TScalarType f = 0.5 * r*r / (m_Sigma2*m_Alpha) + 1;
+        D[0] = 2*m_Scale * std::pow(f,-m_Alpha);
+        D[1] = m_Scale2 * (r*r) * std::pow(f, -m_Alpha - 1) / m_Sigma3;
+        D[2] = m_Scale2 *((r*r/(2*m_Sigma2*f*m_Alpha))-std::log(f))*std::pow(f,-m_Alpha);
+        return D;
     }
 
     // for convenience the constructor can be called
     // with scalars or with strings (ParameterType)
     RationalQuadraticKernel(TScalarType scale, TScalarType sigma, TScalarType alpha) : Superclass(),
-        m_Scale(scale*scale),
+        m_Scale(scale),
         m_Sigma(sigma),
-        m_Alpha(alpha){
+        m_Alpha(alpha),
+        m_Scale2(scale*scale),
+        m_Sigma2(sigma*sigma),
+        m_Sigma3(sigma*sigma*sigma){
 
-        this->m_parameters.push_back(Self::P2S(scale));
+        this->m_parameters.push_back(Self::P2S(m_Scale));
         this->m_parameters.push_back(Self::P2S(m_Sigma));
         this->m_parameters.push_back(Self::P2S(m_Alpha));
     }
@@ -493,6 +565,10 @@ private:
     TScalarType m_Sigma;
     TScalarType m_Alpha;
 
+    TScalarType m_Scale2;
+    TScalarType m_Sigma2;
+    TScalarType m_Sigma3;
+
     RationalQuadraticKernel(const Self&); //purposely not implemented
     void operator=(const Self&); //purposely not implemented
 };
@@ -518,22 +594,54 @@ public:
     virtual inline TScalarType operator()(const VectorType & x, const VectorType & y) const{
         TScalarType sum = 0;
         for(unsigned i=0; i<x.rows(); i++){
-            double f = std::sin(m_B*(x[i] - y[i]))/m_Sigma;
+            double f = std::sin(m_B*(x[i] - y[i]));
             sum += f*f;
         }
 
-        return m_Scale * std::exp(-0.5*sum);
+        return m_Scale2 * std::exp(-0.5*sum/m_Sigma2);
+    }
+
+    virtual inline VectorType GetDerivative(const VectorType & x, const VectorType & y) const{
+        VectorType D = VectorType::Zero(3);
+
+        TScalarType f1 = 0;
+        for(unsigned i=0; i<x.rows(); i++){
+            double r = std::sin(m_B*(x[i] - y[i]));
+            f1 += r*r / m_Sigma2;
+        }
+
+        TScalarType f2 = 0;
+        for(unsigned i=0; i<x.rows(); i++){
+            double r = (x[i] - y[i]);
+            double v = 2*r * std::cos(m_B*r) * std::sin(m_B*r);
+            f2 += v / m_Sigma2;
+        }
+
+        TScalarType f3 = 0;
+        for(unsigned i=0; i<x.rows(); i++){
+            double r = (x[i] - y[i]);
+            double v = std::sin(m_B*r);
+            f3 += -2* (v*v) / m_Sigma3;
+        }
+
+        D[0] = 2*m_Scale * std::exp(-0.5*f1);
+        D[1] = -0.5 * m_Scale2 * std::exp(-0.5*f1) * f2;
+        D[2] = -0.5 * m_Scale2 * std::exp(-0.5*f1) * f3;
+        return D;
     }
 
     PeriodicKernel(TScalarType scale,
                    TScalarType b,
                    TScalarType sigma) : Superclass(),
-            m_Scale(scale*scale),
+            m_Scale(scale),
             m_B(b),
-            m_Sigma(sigma)
+            m_Sigma(sigma),
+            m_Scale2(scale*scale),
+            m_Sigma2(sigma*sigma),
+            m_Sigma3(sigma*sigma*sigma)
             {
 
-        this->m_parameters.push_back(Self::P2S(scale));
+        this->m_parameters.push_back(Self::P2S(m_Scale));
         this->m_parameters.push_back(Self::P2S(m_B));
         this->m_parameters.push_back(Self::P2S(m_Sigma));
     }
@@ -561,6 +669,10 @@ private:
     TScalarType m_Scale;
     TScalarType m_B;
     TScalarType m_Sigma;
+
+    TScalarType m_Scale2;
+    TScalarType m_Sigma2;
+    TScalarType m_Sigma3;
 
     PeriodicKernel(const Self&); //purposely not implemented
     void operator=(const Self&); //purposely not implemented

@@ -2,6 +2,7 @@ INSTALL(FILES
 	GaussianProcess.h 
 	Kernel.h
 	KernelFactory.h
+	KernelUtils.h
 	MatrixIO.h
 	Likelihood.h
 DESTINATION
