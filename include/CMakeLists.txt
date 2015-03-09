@@ -5,6 +5,8 @@ INSTALL(FILES
 	KernelUtils.h
 	MatrixIO.h
 	Likelihood.h
+	LikelihoodUtils.h
+	Prior.h
 DESTINATION
 	include
 PERMISSIONS

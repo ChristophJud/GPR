@@ -385,7 +385,7 @@ void GaussianProcess<TScalarType>::ComputeDerivativeKernelMatrix(typename Gaussi
         std::cout.flush();
     }
 
-    unsigned num_params = m_Kernel->GetParameters().size();
+    unsigned num_params = m_Kernel->GetNumberOfParameters();
 
     unsigned n = m_SampleVectors.size();
     M.resize(n*num_params,n);
@@ -398,13 +398,18 @@ void GaussianProcess<TScalarType>::ComputeDerivativeKernelMatrix(typename Gaussi
 
             if(v.rows() != num_params) throw std::string("GaussianProcess::ComputeDerivativeKernelMatrix: dimension missmatch in derivative.");
             for(unsigned p=0; p<num_params; p++){
+
+                //if(i+p*n >= M.rows() || j+p*n >= M.rows())  throw std::string("GaussianProcess::ComputeDerivativeKernelMatrix: dimension missmatch in derivative.");
+
                 M(i + p*n, j) = v[p];
-                M(j, i + p*n) = v[p];
+                M(j + p*n, i) = v[p];
 
                 //if(i + p*n == j) M(i + p*n, j) += m_Sigma;
             }
         }
     }
+    //std::cout << "M: " << std::endl;
+    //std::cout << M << std::endl;
     if(debug) std::cout << "[done]" << std::endl;
 }
 

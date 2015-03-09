@@ -56,6 +56,7 @@ public:
     }
 
     virtual std::string ToString() const = 0;
+    virtual unsigned GetNumberOfParameters() const = 0;
 
     // returns the parameter vector
     virtual inline const ParameterVectorType GetParameters(){
@@ -223,6 +224,10 @@ public:
                         KernelFactory<TScalarType>::Load(ks2, params2)));
     }
 
+    virtual unsigned GetNumberOfParameters() const{
+        return m_Kernel1->GetNumberOfParameters() + m_Kernel2->GetNumberOfParameters();
+    }
+
     const SuperclassPointer GetKernel1() { return m_Kernel1; }
     const SuperclassPointer GetKernel2() { return m_Kernel2; }
 
@@ -335,6 +340,10 @@ public:
                         KernelFactory<TScalarType>::Load(ks2, params2)));
     }
 
+    virtual unsigned GetNumberOfParameters() const{
+        return m_Kernel1->GetNumberOfParameters() + m_Kernel2->GetNumberOfParameters();
+    }
+
     const SuperclassPointer GetKernel1() { return m_Kernel1; }
     const SuperclassPointer GetKernel2() { return m_Kernel2; }
 
@@ -408,10 +417,14 @@ public:
     // Needed from the KernelFactory to instantiate
     // a kernel given a parameter vector;
     static SelfPointer Load(const ParameterVectorType& parameters){
-        if(parameters.size() != 2){
+        if(parameters.size() != m_NumberOfParameters){
             throw std::string("GaussianKernel::Load: wrong number of kernel parameters.");
         }
         return SelfPointer(new Self(Self::S2P(parameters[0]), Self::S2P(parameters[1])));
+    }
+
+    virtual unsigned GetNumberOfParameters() const{
+        return m_NumberOfParameters;
     }
 
 private:
@@ -421,10 +434,14 @@ private:
     TScalarType m_Sigma2;
     TScalarType m_Sigma3;
     TScalarType m_Scale2;
+
+    static unsigned m_NumberOfParameters;
 	
 	GaussianKernel(const Self&); //purposely not implemented
     void operator=(const Self&); //purposely not implemented
 };
+template <class TScalarType>
+unsigned GaussianKernel<TScalarType>::m_NumberOfParameters = 2;
 
 
 /*
@@ -483,19 +500,27 @@ public:
     // Needed from the KernelFactory to instantiate
     // a kernel given a parameter vector;
     static SelfPointer Load(const ParameterVectorType& parameters){
-        if(parameters.size() != 1){
+        if(parameters.size() != m_NumberOfParameters){
             throw std::string("GaussianKernel::Load: wrong number of kernel parameters.");
         }
         return SelfPointer(new Self(Self::S2P(parameters[0])));
+    }
+
+    virtual unsigned GetNumberOfParameters() const{
+        return m_NumberOfParameters;
     }
 
 private:
     TScalarType m_Scale;
     TScalarType m_Scale2;
 
+    static unsigned m_NumberOfParameters;
+
     WhiteKernel(const Self&); //purposely not implemented
     void operator=(const Self&); //purposely not implemented
 };
+template <class TScalarType>
+unsigned WhiteKernel<TScalarType>::m_NumberOfParameters = 1;
 
 
 /*
@@ -560,10 +585,14 @@ public:
     // Needed from the KernelFactory to instantiate
     // a kernel given a parameter vector;
     static SelfPointer Load(const ParameterVectorType& parameters){
-        if(parameters.size() != 3){
+        if(parameters.size() != m_NumberOfParameters){
             throw std::string("RationalQuadraticKernel::Load: wrong number of kernel parameters.");
         }
         return SelfPointer(new Self(Self::S2P(parameters[0]), Self::S2P(parameters[1]), Self::S2P(parameters[2])));
+    }
+
+    virtual unsigned GetNumberOfParameters() const{
+        return m_NumberOfParameters;
     }
 
 private:
@@ -575,9 +604,13 @@ private:
     TScalarType m_Sigma2;
     TScalarType m_Sigma3;
 
+    static unsigned m_NumberOfParameters;
+
     RationalQuadraticKernel(const Self&); //purposely not implemented
     void operator=(const Self&); //purposely not implemented
 };
+template <class TScalarType>
+unsigned RationalQuadraticKernel<TScalarType>::m_NumberOfParameters = 3;
 
 /*
  * Periodic Kernel: k(x,y) = scale^2 exp( -0.5 sum_d=1^D sin(b(x_d-y_d))/sigma_d)^2 )
@@ -666,11 +699,16 @@ public:
     // Needed from the KernelFactory to instantiate
     // a kernel given a parameter vector;
     static SelfPointer Load(const ParameterVectorType& parameters){
-        if(parameters.size() != 3){
+        if(parameters.size() != m_NumberOfParameters){
             throw std::string("PeriodicKernel::Load: wrong number of kernel parameters.");
         }
         return SelfPointer(new Self(Self::S2P(parameters[0]), Self::S2P(parameters[1]), Self::S2P(parameters[2])));
     }
+
+    virtual unsigned GetNumberOfParameters() const{
+        return m_NumberOfParameters;
+    }
+
 private:
     TScalarType m_Scale;
     TScalarType m_B;
@@ -680,9 +718,13 @@ private:
     TScalarType m_Sigma2;
     TScalarType m_Sigma3;
 
+    static unsigned m_NumberOfParameters;
+
     PeriodicKernel(const Self&); //purposely not implemented
     void operator=(const Self&); //purposely not implemented
 };
+template <class TScalarType>
+unsigned PeriodicKernel<TScalarType>::m_NumberOfParameters = 3;
 
 
 
