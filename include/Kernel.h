@@ -223,6 +223,9 @@ public:
                         KernelFactory<TScalarType>::Load(ks2, params2)));
     }
 
+    const SuperclassPointer GetKernel1() { return m_Kernel1; }
+    const SuperclassPointer GetKernel2() { return m_Kernel2; }
+
 private:
     const std::string k_string1;
     const std::string k_string2;
@@ -331,6 +334,9 @@ public:
         return SelfPointer(new Self(KernelFactory<TScalarType>::Load(ks1, params1),
                         KernelFactory<TScalarType>::Load(ks2, params2)));
     }
+
+    const SuperclassPointer GetKernel1() { return m_Kernel1; }
+    const SuperclassPointer GetKernel2() { return m_Kernel2; }
 
 private:
     const std::string k_string1;

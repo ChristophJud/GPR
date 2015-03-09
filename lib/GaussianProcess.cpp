@@ -379,6 +379,36 @@ void GaussianProcess<TScalarType>::ComputeKernelMatrix(typename GaussianProcess<
 }
 
 template< class TScalarType >
+void GaussianProcess<TScalarType>::ComputeDerivativeKernelMatrix(typename GaussianProcess<TScalarType>::MatrixType &M) const{
+    if(debug){
+        std::cout << "GaussianProcess::ComputeDerivativeKernelMatrix: building kernel matrix... ";
+        std::cout.flush();
+    }
+
+    unsigned num_params = m_Kernel->GetParameters().size();
+
+    unsigned n = m_SampleVectors.size();
+    M.resize(n*num_params,n);
+
+#pragma omp parallel for
+    for(unsigned i=0; i<n; i++){
+        for(unsigned j=i; j<n; j++){
+            typename GaussianProcess<TScalarType>::VectorType v;
+            v = m_Kernel->GetDerivative(m_SampleVectors[i], m_SampleVectors[j]);
+
+            if(v.rows() != num_params) throw std::string("GaussianProcess::ComputeDerivativeKernelMatrix: dimension missmatch in derivative.");
+            for(unsigned p=0; p<num_params; p++){
+                M(i + p*n, j) = v[p];
+                M(j, i + p*n) = v[p];
+
+                //if(i + p*n == j) M(i + p*n, j) += m_Sigma;
+            }
+        }
+    }
+    if(debug) std::cout << "[done]" << std::endl;
+}
+
+template< class TScalarType >
 TScalarType GaussianProcess<TScalarType>::ComputeCoreMatrix(typename GaussianProcess<TScalarType>::MatrixType &C){
     MatrixType K;
     ComputeKernelMatrix(K);

@@ -60,6 +60,10 @@ protected:
         return gp->ComputeCoreMatrix(C); // computes core and returns kernel matrix
     }
 
+    void GetDerivativeKernelMatrix(const GaussianProcessTypePointer gp, MatrixType& D) const{
+        return gp->ComputeDerivativeKernelMatrix(D); // computes derivative of kernel
+    }
+
 private:
       Likelihood (const Self&); //purposely not implemented
       void operator=(const Self&); //purposely not implemented
@@ -97,6 +101,32 @@ public:
         TScalarType ct = -C.rows()/2 * std::log(2*M_PI);
 
         return df.array() + (cp + ct);
+    }
+
+    virtual inline MatrixType GetParameterDerivatives(const GaussianProcessTypePointer gp) const{
+        MatrixType Y; // label matrix
+        this->GetLabelMatrix(gp, Y);
+
+        MatrixType C; // core matrix inv(K + sigmaI)
+        this->GetCoreMatrix(gp, C);
+
+        MatrixType alpha = C*Y;
+
+        MatrixType D;
+        this->GetDerivativeKernelMatrix(D);
+
+        unsigned num_params = static_cast<unsigned>(D.rows()/D.cols());
+        if(static_cast<double>(D.rows())/static_cast<double>(D.cols()) - num_params != 0){
+            throw std::string("GaussianLogLikelihood: wrong dimension of derivative kernel matrix.");
+        }
+        MatrixType delta = MatrixType::Zero(1, num_params);
+
+
+        for(unsigned p=0; p<num_params; p++){
+            delta(1,p) = 0.5 * ((alpha*alpha.adjoint() - C) * D.block(p*D.cols(),0,D.rows(),D.cols())).trace();
+        }
+
+        return delta;
     }
 
     GaussianLogLikelihood() : Superclass(){  }

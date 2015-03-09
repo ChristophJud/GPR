@@ -34,8 +34,8 @@ class GaussianProcess
 public:
 	typedef GaussianProcess Self;
 	typedef Kernel<TScalarType> KernelType;
-	typedef std::shared_ptr<KernelType> KernelTypePointer;
-	
+    typedef std::shared_ptr<KernelType> KernelTypePointer;
+
     typedef Eigen::Matrix<TScalarType, Eigen::Dynamic, 1> VectorType;
     typedef Eigen::Matrix<TScalarType, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> MatrixType;
     typedef Eigen::DiagonalMatrix<TScalarType, Eigen::Dynamic> DiagMatrixType;
@@ -165,6 +165,18 @@ private:
 	 * 	  has to be performed
 	 */
     void ComputeKernelMatrix(MatrixType &M) const;
+
+
+    /*
+     * Computation of the derivative kernel matrix D_i = delta K / delta params_i
+     * 	- returns a matrix: [D_0
+     *                        .
+     *                       D_i
+     *                        .
+     *                       D_m-1]
+     *    for m = number of params and D_i in nxn, n = number of samples
+     */
+    void ComputeDerivativeKernelMatrix(MatrixType &M) const;
 
     /*
      * Computation of the core matrix inv(K + sigma I)
