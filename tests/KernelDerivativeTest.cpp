@@ -197,10 +197,10 @@ void Test3(){
     // sigma and alpha are not that stable with central difference
 
     if(err[0]/counter < 1e-13 && err[1]/counter < 0.001 && err[2]/counter < 1e-4){
-        std::cout << "\t[passed]." << std::endl;
+        std::cout << "\t\t[passed]." << std::endl;
     }
     else{
-        std::cout << "\t[failed]." << std::endl;
+        std::cout << "\t\t[failed]." << std::endl;
     }
 }
 
@@ -268,9 +268,9 @@ void Test4(){
 
 void Test5(){
     /*
-     * Test 4: derivative test of kernels
+     * Test 5: derivative test of kernels
      */
-    std::cout << "Test 4: sum of gaussian and periodic kernel derivative... " << std::flush;
+    std::cout << "Test 5: sum of gaussian and periodic kernel derivative... " << std::flush;
 
     VectorType x = VectorType::Zero(2);
     x(0) = 0.1; x(1) = 0.5;
@@ -280,8 +280,8 @@ void Test5(){
 
 
     // typedefs
-    typedef SumKernel<ScalarType>                SumKernelType;
-    typedef std::shared_ptr<SumKernelType>       SumKernelTypePointer;
+    typedef SumKernel<ScalarType>                ProductKernelType;
+    typedef std::shared_ptr<ProductKernelType>       ProductKernelTypePointer;
     typedef GaussianKernel<ScalarType>           GaussianKernelType;
     typedef std::shared_ptr<GaussianKernelType>  GaussianKernelTypePointer;
     typedef PeriodicKernel<ScalarType>           PeriodicKernelType;
@@ -291,62 +291,62 @@ void Test5(){
     VectorType err = VectorType::Zero(5);
     unsigned counter = 0;
 
-    for(double gscale=0.1; gscale<3; gscale+=0.5){
-        for(double gsigma=0.1; gsigma<8; gsigma+=0.4){
-            for(double pscale=0.1; pscale<3; pscale+=0.8){
-                for(double b=0; b<5*M_PI; b+=0.3){
-                    for(double psigma=0.1; psigma<6; psigma+=0.6){
+    for(double gscale=0.1; gscale<5; gscale+=0.8){
+        for(double gsigma=0.1; gsigma<6; gsigma+=0.4){
+            for(double pscale=0.1; pscale<4; pscale+=0.8){
+                for(double b=0; b<5*M_PI; b+=0.4){
+                    for(double psigma=0.2; psigma<6; psigma+=0.3){
 
                         // analytical derivative
                         GaussianKernelTypePointer gk(new GaussianKernelType(gsigma, gscale));
                         PeriodicKernelTypePointer pk(new PeriodicKernelType(pscale, b, psigma));
-                        SumKernelTypePointer k(new SumKernelType(gk,pk));
+                        ProductKernelTypePointer k(new ProductKernelType(gk,pk));
                         VectorType D = k->GetDerivative(x,y);
 
                         // gaussian scale central difference
                         GaussianKernelTypePointer gk1_gscale(new GaussianKernelType(gsigma, gscale+h/2));
                         GaussianKernelTypePointer gk2_gscale(new GaussianKernelType(gsigma, gscale-h/2));
-                        SumKernelTypePointer k1_gscale(new SumKernelType(gk1_gscale, pk));
-                        SumKernelTypePointer k2_gscale(new SumKernelType(gk2_gscale, pk));
+                        ProductKernelTypePointer k1_gscale(new ProductKernelType(gk1_gscale, pk));
+                        ProductKernelTypePointer k2_gscale(new ProductKernelType(gk2_gscale, pk));
                         double cd_gscale = (*k1_gscale)(x,y) - (*k2_gscale)(x,y);
                         cd_gscale/=h;
 
                         // gaussian scale central difference
                         GaussianKernelTypePointer gk1_gsigma(new GaussianKernelType(gsigma+h/2, gscale));
                         GaussianKernelTypePointer gk2_gsigma(new GaussianKernelType(gsigma-h/2, gscale));
-                        SumKernelTypePointer k1_gsigma(new SumKernelType(gk1_gsigma, pk));
-                        SumKernelTypePointer k2_gsigma(new SumKernelType(gk2_gsigma, pk));
+                        ProductKernelTypePointer k1_gsigma(new ProductKernelType(gk1_gsigma, pk));
+                        ProductKernelTypePointer k2_gsigma(new ProductKernelType(gk2_gsigma, pk));
                         double cd_gsigma = (*k1_gsigma)(x,y) - (*k2_gsigma)(x,y);
                         cd_gsigma/=h;
 
                         // periodic scale central difference
                         PeriodicKernelTypePointer pk1_pscale(new PeriodicKernelType(pscale+h/2, b, psigma));
                         PeriodicKernelTypePointer pk2_pscale(new PeriodicKernelType(pscale-h/2, b, psigma));
-                        SumKernelTypePointer k1_pscale(new SumKernelType(gk, pk1_pscale));
-                        SumKernelTypePointer k2_pscale(new SumKernelType(gk, pk2_pscale));
+                        ProductKernelTypePointer k1_pscale(new ProductKernelType(gk, pk1_pscale));
+                        ProductKernelTypePointer k2_pscale(new ProductKernelType(gk, pk2_pscale));
                         double cd_pscale = (*k1_pscale)(x,y) - (*k2_pscale)(x,y);
                         cd_pscale/=h;
 
                         // periodic period length central difference
                         PeriodicKernelTypePointer pk1_pb(new PeriodicKernelType(pscale, b+h/2, psigma));
                         PeriodicKernelTypePointer pk2_pb(new PeriodicKernelType(pscale, b-h/2, psigma));
-                        SumKernelTypePointer k1_pb(new SumKernelType(gk, pk1_pb));
-                        SumKernelTypePointer k2_pb(new SumKernelType(gk, pk2_pb));
+                        ProductKernelTypePointer k1_pb(new ProductKernelType(gk, pk1_pb));
+                        ProductKernelTypePointer k2_pb(new ProductKernelType(gk, pk2_pb));
                         double cd_pb = (*k1_pb)(x,y) - (*k2_pb)(x,y);
                         cd_pb/=h;
 
                         // periodic sigma central difference
                         PeriodicKernelTypePointer pk1_psigma(new PeriodicKernelType(pscale, b, psigma+h/2));
                         PeriodicKernelTypePointer pk2_psigma(new PeriodicKernelType(pscale, b, psigma-h/2));
-                        SumKernelTypePointer k1_psigma(new SumKernelType(gk, pk1_psigma));
-                        SumKernelTypePointer k2_psigma(new SumKernelType(gk, pk2_psigma));
+                        ProductKernelTypePointer k1_psigma(new ProductKernelType(gk, pk1_psigma));
+                        ProductKernelTypePointer k2_psigma(new ProductKernelType(gk, pk2_psigma));
                         double cd_psigma = (*k1_psigma)(x,y) - (*k2_psigma)(x,y);
                         cd_psigma/=h;
 
 
 
-                        err[0] += std::fabs(cd_psigma-D[0]);
-                        err[1] += std::fabs(cd_pscale-D[1]);
+                        err[0] += std::fabs(cd_gsigma-D[0]);
+                        err[1] += std::fabs(cd_gscale-D[1]);
                         err[2] += std::fabs(cd_pscale-D[2]);
                         err[3] += std::fabs(cd_pb-D[3]);
                         err[4] += std::fabs(cd_psigma-D[4]);
@@ -357,12 +357,114 @@ void Test5(){
         }
     }
 
-    for(unsigned i=0; i<5; i++){
-        std::cout << err[i]/counter << ", " << std::flush;
+    if(err[0]/counter < 0.005 &&
+            err[1]/counter < 1e-11 &&
+            err[2]/counter < 1e-11 &&
+            err[2]/counter < 1e-5 &&
+            err[2]/counter < 1e-3){
+        std::cout << "\t[passed]." << std::endl;
     }
-    std::cout << std::endl;
+    else{
+        std::cout << "\t[failed]." << std::endl;
+    }
+}
 
-    if(err[0]/counter < 1e-13 && err[1]/counter < 1e-3 && err[2]/counter < 0.001){
+void Test6(){
+    /*
+     * Test 6: derivative test of kernels
+     */
+    std::cout << "Test 6: product of gaussian and periodic kernel derivative... " << std::flush;
+
+    VectorType x = VectorType::Zero(2);
+    x(0) = 0.1; x(1) = 0.5;
+
+    VectorType y = VectorType::Zero(2);
+    y(0) = -0.1; y(1) = 0.8;
+
+
+    // typedefs
+    typedef ProductKernel<ScalarType>            ProductKernelType;
+    typedef std::shared_ptr<ProductKernelType>   ProductKernelTypePointer;
+    typedef GaussianKernel<ScalarType>           GaussianKernelType;
+    typedef std::shared_ptr<GaussianKernelType>  GaussianKernelTypePointer;
+    typedef PeriodicKernel<ScalarType>           PeriodicKernelType;
+    typedef std::shared_ptr<PeriodicKernelType>  PeriodicKernelTypePointer;
+
+    double h = 0.01;
+    VectorType err = VectorType::Zero(5);
+    unsigned counter = 0;
+
+    for(double gscale=0.4; gscale<4; gscale+=0.8){
+        for(double gsigma=0.1; gsigma<5; gsigma+=0.4){
+            for(double pscale=0.1; pscale<4; pscale+=0.8){
+                for(double b=0; b<4*M_PI; b+=0.4){
+                    for(double psigma=0.4; psigma<5; psigma+=0.3){
+
+                        // analytical derivative
+                        GaussianKernelTypePointer gk(new GaussianKernelType(gsigma, gscale));
+                        PeriodicKernelTypePointer pk(new PeriodicKernelType(pscale, b, psigma));
+                        ProductKernelTypePointer k(new ProductKernelType(gk,pk));
+                        VectorType D = k->GetDerivative(x,y);
+
+                        // gaussian scale central difference
+                        GaussianKernelTypePointer gk1_gscale(new GaussianKernelType(gsigma, gscale+h/2));
+                        GaussianKernelTypePointer gk2_gscale(new GaussianKernelType(gsigma, gscale-h/2));
+                        ProductKernelTypePointer k1_gscale(new ProductKernelType(gk1_gscale, pk));
+                        ProductKernelTypePointer k2_gscale(new ProductKernelType(gk2_gscale, pk));
+                        double cd_gscale = (*k1_gscale)(x,y) - (*k2_gscale)(x,y);
+                        cd_gscale/=h;
+
+                        // gaussian scale central difference
+                        GaussianKernelTypePointer gk1_gsigma(new GaussianKernelType(gsigma+h/2, gscale));
+                        GaussianKernelTypePointer gk2_gsigma(new GaussianKernelType(gsigma-h/2, gscale));
+                        ProductKernelTypePointer k1_gsigma(new ProductKernelType(gk1_gsigma, pk));
+                        ProductKernelTypePointer k2_gsigma(new ProductKernelType(gk2_gsigma, pk));
+                        double cd_gsigma = (*k1_gsigma)(x,y) - (*k2_gsigma)(x,y);
+                        cd_gsigma/=h;
+
+                        // periodic scale central difference
+                        PeriodicKernelTypePointer pk1_pscale(new PeriodicKernelType(pscale+h/2, b, psigma));
+                        PeriodicKernelTypePointer pk2_pscale(new PeriodicKernelType(pscale-h/2, b, psigma));
+                        ProductKernelTypePointer k1_pscale(new ProductKernelType(gk, pk1_pscale));
+                        ProductKernelTypePointer k2_pscale(new ProductKernelType(gk, pk2_pscale));
+                        double cd_pscale = (*k1_pscale)(x,y) - (*k2_pscale)(x,y);
+                        cd_pscale/=h;
+
+                        // periodic period length central difference
+                        PeriodicKernelTypePointer pk1_pb(new PeriodicKernelType(pscale, b+h/2, psigma));
+                        PeriodicKernelTypePointer pk2_pb(new PeriodicKernelType(pscale, b-h/2, psigma));
+                        ProductKernelTypePointer k1_pb(new ProductKernelType(gk, pk1_pb));
+                        ProductKernelTypePointer k2_pb(new ProductKernelType(gk, pk2_pb));
+                        double cd_pb = (*k1_pb)(x,y) - (*k2_pb)(x,y);
+                        cd_pb/=h;
+
+                        // periodic sigma central difference
+                        PeriodicKernelTypePointer pk1_psigma(new PeriodicKernelType(pscale, b, psigma+h/2));
+                        PeriodicKernelTypePointer pk2_psigma(new PeriodicKernelType(pscale, b, psigma-h/2));
+                        ProductKernelTypePointer k1_psigma(new ProductKernelType(gk, pk1_psigma));
+                        ProductKernelTypePointer k2_psigma(new ProductKernelType(gk, pk2_psigma));
+                        double cd_psigma = (*k1_psigma)(x,y) - (*k2_psigma)(x,y);
+                        cd_psigma/=h;
+
+
+
+                        err[0] += std::fabs(cd_gsigma-D[0]);
+                        err[1] += std::fabs(cd_gscale-D[1]);
+                        err[2] += std::fabs(cd_pscale-D[2]);
+                        err[3] += std::fabs(cd_pb-D[3]);
+                        err[4] += std::fabs(cd_psigma-D[4]);
+                        counter++;
+                    }
+                }
+            }
+        }
+    }
+
+    if(err[0]/counter < 0.009 &&
+            err[1]/counter < 1e-11 &&
+            err[2]/counter < 1e-11 &&
+            err[3]/counter < 1e-5 &&
+            err[4]/counter < 0.001){
         std::cout << "\t[passed]." << std::endl;
     }
     else{
@@ -378,6 +480,7 @@ int main (int argc, char *argv[]){
         Test3();
         Test4();
         Test5();
+        Test6();
     }
     catch(std::string& s){
         std::cout << "Error: " << s << std::endl;
