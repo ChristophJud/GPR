@@ -114,79 +114,96 @@ void Test1(){
      *   - GammaDensity to sample parameters
      *   -LogGammaDensity to evaluate prior for the posterior
      */
+    std::vector< std::pair< std::string, std::pair<double,double> > > pdf_params;
+    pdf_params.push_back(std::make_pair("WScale", std::make_pair(4, 1))); // white kernel
+    pdf_params.push_back(std::make_pair("PPeriod", std::make_pair(p_estimate/0.5, 0.5))); // period kernel
+    pdf_params.push_back(std::make_pair("PScale", std::make_pair(5 ,2)));
+    pdf_params.push_back(std::make_pair("PSigma", std::make_pair(3, 1.5)));
+    pdf_params.push_back(std::make_pair("GScale", std::make_pair(10, 0.3))); // gaussian kernel
+    pdf_params.push_back(std::make_pair("GSigma", std::make_pair(10, 0.3)));
+
+
     typedef gpr::GammaDensity<double>          GammaDensityType;
     typedef gpr::LogGammaDensity<double>       LogGammaDensityType;
+    typedef gpr::GaussianDensity<double>        GaussianDensityType;
+    typedef gpr::LogGaussianDensity<double>     LogGaussianDensityType;
 
-    // for period kernel
-    LogGammaDensityType lgd_pperiod(p_estimate/0.5, 0.5);
-    LogGammaDensityType lgd_pscale(4.5,2);
-    LogGammaDensityType lgd_psigma(2.5, 0.5);
-    // for gaussian kernel
-    LogGammaDensityType lgd_gscale(5,1);
-    LogGammaDensityType lgd_gsigma(3,3.5);
-    // for white kernel
-    LogGammaDensityType lgd_wscale(3,0.4);
+    std::vector< std::pair<std::string, GammaDensityType*> > pdfs;
+    for(auto const &p : pdf_params){
+        pdfs.push_back(std::make_pair(p.first, new GammaDensityType(p.second.first, p.second.second)));
+    }
 
-    // for period kernel
-    GammaDensityType gd_pperiod(p_estimate/0.5, 0.5);
-    GammaDensityType gd_pscale(4.5,2);
-    GammaDensityType gd_psigma(2.5, 0.5);
-    // for gaussian kernel
-    GammaDensityType gd_gscale(5,1);
-    GammaDensityType gd_gsigma(3,3.5);
-    // for white kernel
-    GammaDensityType gd_wscale(3,0.4);
+    std::vector< std::pair<std::string, LogGammaDensityType*> > logpdfs;
+    for(auto const &p : pdf_params){
+        logpdfs.push_back(std::make_pair(p.first, new LogGammaDensityType(p.second.first, p.second.second)));
+    }
 
-
-
-
-    // initial kernel
-    VectorType parameters = VectorType::Zero(6);
-    parameters[0] = gd_wscale();
-    parameters[1] = gd_pperiod();
-    parameters[2] = gd_pscale();
-    parameters[3] = gd_psigma();
-    parameters[4] = gd_gscale();
-    parameters[5] = gd_gsigma();
+        // initial kernel
+    VectorType parameters = VectorType::Zero(pdf_params.size());
+    for(unsigned i=0; i<parameters.rows(); i++){
+        parameters[i] = (*pdfs[i].second)();
+    }
 
     gp->SetKernel(GetKernel(parameters));
 
     // begin optimization
     double lambda = 0.011;
+    double w = 0.5; // trade off likelihood and prior: 1 -> only likelihood, 0 -> only prior
+    if(w>1) w=1;
+    if(w<0) w=0;
 
+
+    double likelihood_value, prior_value;
     for(unsigned i=0; i<100; i++){
 
         try{
 
-            VectorType value = (*gl)(gp);
-            std::cout << "Iteration: " << i << ", likelihood: " << value;
+            likelihood_value = (*gl)(gp)[0];
+            std::cout << "Iteration: " << i << ", likelihood: " << w*likelihood_value;
 
-            VectorType update = gl->GetParameterDerivatives(gp);
+            VectorType likelihood_update = gl->GetParameterDerivatives(gp);
             //std::cout << ", gradient: " << update.transpose() << std::endl;
 
-
-
-            if(update.rows()!=parameters.rows()){
+            if(likelihood_update.rows()!=parameters.rows()){
                 std::cout << "[failed] Wrong number of parameters" << std::endl;
+            }
+            if(logpdfs.size() != parameters.rows()){
+                std::cout << "[failed] wrong number of parameters or prior" << std::endl;
+            }
+
+            VectorType prior_update = VectorType::Zero(parameters.rows());
+            for(unsigned p=0; p<parameters.rows(); p++){
+                prior_update[p] = logpdfs[p].second->GetDerivative(parameters[p]);
+            }
+
+            prior_value = 0;
+            for(unsigned p=0; p<pdfs.size(); p++){
+                prior_value += (*pdfs[p].second)(parameters[p]);
             }
 
             for(unsigned p=0; p<parameters.rows(); p++){
-                parameters[p] -= lambda * update[p];
+                double gradient = w * likelihood_update[p] + (1-w) * prior_update[p];
+                parameters[p] -= lambda * gradient;
             }
 
-            std::cout << ", parameters: " << parameters.transpose() << std::endl;
+            std::cout << ", prior: " << (1-w) * prior_value << std::flush;
+
+            std::cout << ", parameters: " << parameters.transpose() << std::flush;
+            std::cout << ", likelihood_update: " << likelihood_update.transpose() << std::flush;
+            std::cout << ", prior_update: " << prior_update.transpose() << std::endl;
 
             gp->SetKernel(GetKernel(parameters));
         }
         catch(std::string& s){
             std::cout << "Error: " << s << std::endl;
-            return;
+            break;
+            //return;
         }
     }
 
     std::cout << "Parameters are: " << parameters.transpose() << std::endl;
-
-    return;
+    std::cout << "\"\"\"" << std::endl;
+    //return;
 
     std::vector<double> prediction_y;
     std::vector<double> prediction_x;
@@ -197,8 +214,6 @@ void Test1(){
         prediction_x.push_back(i);
     }
 
-    std::cout << "import numpy as np" << std::endl;
-    std::cout << "import pylab as plt" << std::endl;
     std::cout << "p=np.array([";
     for(unsigned i=0; i<prediction_y.size(); i++){
         std::cout << prediction_y[i] << ", " << std::flush;
@@ -221,12 +236,21 @@ void Test1(){
     std::cout << "])" << std::endl;
     std::cout << "hx = plt.plot(gtx,gty,'-b', label='ground truth')" << std::endl;
     std::cout << "hx = plt.plot(x,p,'-r', label='prediction')" << std::endl;
+
+    std::stringstream ss;
+    ss << "prior: " << (1-w) * prior_value << "\\n";
+    ss << ", likelihood: " << w*likelihood_value << "\\n";
+    ss << parameters.transpose();
+    std::cout << "plt.title(\"" << ss.str() << "\")" << std::endl;
     std::cout << "plt.legend()" << std::endl;
     std::cout << "plt.show()" << std::endl;
 }
 
 
 int main (int argc, char *argv[]){
+    std::cout << "import numpy as np" << std::endl;
+    std::cout << "import pylab as plt" << std::endl;
+    std::cout << "\"\"\"" << std::endl;
     std::cout << "Gaussian likelihood kernel test: " << std::endl;
     try{
     Test1();
