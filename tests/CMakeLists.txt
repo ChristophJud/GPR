@@ -10,7 +10,6 @@ SET(rq_lib_src RationalQuadraticKernelTest.cpp )
 SET(hq_lib_src HighlyGeneralKernelTest.cpp )
 SET(kd_lib_src KernelDerivativeTest.cpp )
 SET(gl_lib_src GaussianLikelihoodTest.cpp)
-SET(dd_lib_src DensityDerivativeTest.cpp)
 
 
 ADD_EXECUTABLE(gpTest ${gp_lib_src})
@@ -25,7 +24,6 @@ ADD_EXECUTABLE(rqTest ${rq_lib_src})
 ADD_EXECUTABLE(hqTest ${hq_lib_src})
 ADD_EXECUTABLE(kdTest ${kd_lib_src})
 ADD_EXECUTABLE(glTest ${gl_lib_src})
-ADD_EXECUTABLE(ddTest ${dd_lib_src})
 
 TARGET_LINK_LIBRARIES( gpTest gplib)
 TARGET_LINK_LIBRARIES( ioTest gplib)
@@ -39,7 +37,6 @@ TARGET_LINK_LIBRARIES( rqTest gplib)
 TARGET_LINK_LIBRARIES( hqTest gplib)
 TARGET_LINK_LIBRARIES( kdTest gplib)
 TARGET_LINK_LIBRARIES( glTest gplib)
-TARGET_LINK_LIBRARIES( ddTest gplib)
 
 SET_TARGET_PROPERTIES(gpTest PROPERTIES OUTPUT_NAME gpTest)
 SET_TARGET_PROPERTIES(ioTest PROPERTIES OUTPUT_NAME ioTest)
@@ -53,7 +50,6 @@ SET_TARGET_PROPERTIES(rqTest PROPERTIES OUTPUT_NAME rqTest)
 SET_TARGET_PROPERTIES(hqTest PROPERTIES OUTPUT_NAME hqTest)
 SET_TARGET_PROPERTIES(kdTest PROPERTIES OUTPUT_NAME kdTest)
 SET_TARGET_PROPERTIES(glTest PROPERTIES OUTPUT_NAME glTest)
-SET_TARGET_PROPERTIES(ddTest PROPERTIES OUTPUT_NAME ddTest)
 
 INSTALL(TARGETS
 	gpTest
@@ -68,7 +64,6 @@ INSTALL(TARGETS
 	hqTest
 	kdTest
 	glTest
-	ddTest
 RUNTIME DESTINATION bin)
 
 INSTALL(FILES 

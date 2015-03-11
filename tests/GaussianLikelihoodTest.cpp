@@ -59,30 +59,32 @@ typedef std::shared_ptr<GaussianProcessType>    GaussianProcessTypePointer;
 // parameters[4] = gscale();
 // parameters[5] = gsigma();
 KernelTypePointer GetKernel(const GaussianProcessType::VectorType& parameters){
-    GaussianKernelTypePointer gk(new GaussianKernelType(parameters[5], parameters[4]));
-    PeriodicKernelTypePointer pk(new PeriodicKernelType(parameters[2], parameters[1], parameters[3]));
-    SumKernelTypePointer sk(new SumKernelType(gk,pk));
-    WhiteKernelTypePointer wk(new WhiteKernelType(parameters[0]));
-    SumKernelTypePointer kernel(new SumKernelType(sk,wk));
-    return kernel;
+    GaussianKernelTypePointer gk(new GaussianKernelType(parameters[1], parameters[0]));
+    //PeriodicKernelTypePointer pk(new PeriodicKernelType(parameters[2], parameters[1], parameters[3]));
+    //SumKernelTypePointer sk(new SumKernelType(gk,pk));
+    //WhiteKernelTypePointer wk(new WhiteKernelType(parameters[0]));
+    //SumKernelTypePointer kernel(new SumKernelType(sk,wk));
+    return gk;
 }
 
 void Test1(){
     /*
      * Test 1.1: perform maximum likelihood
-     *      - Sum kernel of a Gaussian and a Period kernel is used
+     *      - try to infer a squared function
+     *      - maximum is searched by brute force
      */
-    std::cout << "Test 1: maximum log gaussian likelihood... " << std::flush;
+    std::cout << "Test 1: maximum log gaussian likelihood (brute force)... " << std::flush;
 
     typedef GaussianProcessType::VectorType VectorType;
     typedef GaussianProcessType::MatrixType MatrixType;
 
     // generating a signal
     // ground truth periodic variable
-    auto f = [](double x)->double { return 400*std::sin(1.5*x) + x*x; };
+    //auto f = [](double x)->double { return 400*std::sin(1.5*x) + x*x; };
+    auto f = [](double x)->double { return x*x; };
 
     double val = 0;
-    unsigned n = 400;
+    unsigned n = 100;
     MatrixType signal = MatrixType::Zero(2,n);
     for(unsigned i=0; i<n; i++){
         signal(0,i) = val;
@@ -90,26 +92,23 @@ void Test1(){
         val += 100.0/n;
     }
 
-    std::default_random_engine g(static_cast<unsigned int>(std::time(0)));
-    std::normal_distribution<double> dist(0, 1);
-
     // build Gaussian process and add the 1D samples
     WhiteKernelTypePointer pk(new WhiteKernelType(0)); // dummy kernel
     GaussianProcessTypePointer gp(new GaussianProcessType(pk));
-    gp->SetSigma(0); // zero since with the white kernel (see later) this is considered
+    gp->SetSigma(0.001); // zero since with the white kernel (see later) this is considered
 
-    for(unsigned i=0; i<80; i++){
+    for(unsigned i=0; i<10; i++){
         VectorType x = VectorType::Zero(1); x[0] = signal(0,i);
-        VectorType y = VectorType::Zero(1); y[0] = signal(1,i);// + dist(g);
+        VectorType y = VectorType::Zero(1); y[0] = signal(1,i);
         gp->AddSample(x,y);
     }
 
-    for(unsigned i=120; i<160; i++){
+    for(unsigned i=80; i<90; i++){
         VectorType x = VectorType::Zero(1); x[0] = signal(0,i);
-        VectorType y = VectorType::Zero(1); y[0] = signal(1,i);// + dist(g);
+        VectorType y = VectorType::Zero(1); y[0] = signal(1,i);
         gp->AddSample(x,y);
     }
-    //gp->DebugOn();
+
 
     // construct Gaussian log likelihood
     typedef gpr::GaussianLogLikelihood<double> GaussianLogLikelihoodType;
@@ -117,132 +116,248 @@ void Test1(){
     GaussianLogLikelihoodTypePointer gl(new GaussianLogLikelihoodType());
 
 
-    // mean estimate of periodicity parameter
-    double p_estimate =  gpr::GetLocalPeriodLength<double>(signal.block(0,1,80,1).transpose(), 5);
-    std::cout << "Period estimate: " << p_estimate << std::endl;
+    double sigma_max = 0;
+    double scale_max = 0;
+    double likelihood_max = std::numeric_limits<double>::lowest();
 
+    for(double scale=1; scale<1000; scale+=10){
+        for(double sigma=1; sigma<100; sigma+=1){
+            // analytical
+            try{
+                GaussianKernelTypePointer gk(new GaussianKernelType(sigma, scale));
+                gp->SetKernel(gk);
 
-    /*
-     * construct/define prior over the parameters
-     *   - GammaDensity to sample parameters
-     */
-    std::vector< std::pair< std::string, std::pair<double,double> > > pdf_params;
-
-    pdf_params.push_back(std::make_pair("WScale", std::make_pair(2*2*2/2,2))); // white kernel
-    pdf_params.push_back(std::make_pair("PPeriod", std::make_pair(p_estimate*p_estimate/4, p_estimate))); // period kernel
-    pdf_params.push_back(std::make_pair("PScale", std::make_pair(400*400*400/50,50)));
-    pdf_params.push_back(std::make_pair("PSigma", std::make_pair(2*2*2/2,2)));
-    pdf_params.push_back(std::make_pair("GScale", std::make_pair(2*2*2/4,2))); // gaussian kernel
-    pdf_params.push_back(std::make_pair("GSigma", std::make_pair(40*40*40/25,40)));
-
-//   typedef gpr::GammaDensity<double>           DensityType;
-//    typedef gpr::GaussianDensity<double>        DensityType;
-    typedef gpr::InverseGaussianDensity<double>        DensityType;
-
-    std::vector< std::pair<std::string, DensityType*> > pdfs;
-    for(auto const &p : pdf_params){
-        pdfs.push_back(std::make_pair(p.first, new DensityType(p.second.first, p.second.second)));
-    }
-
-
-    // initial kernel
-    VectorType parameters = VectorType::Zero(pdf_params.size());
-    for(unsigned i=0; i<parameters.rows(); i++){
-        parameters[i] = (*pdfs[i].second).mean();
-    }
-
-    gp->SetKernel(GetKernel(parameters));
-
-
-
-    // begin optimization
-    double lambda = 0.000001;
-
-
-    double likelihood_value, prior_value;
-    for(unsigned i=0; i<100; i++){
-
-        try{
-
-            likelihood_value = (*gl)(gp)[0];
-            std::cout << "Iteration: " << i << ", likelihood: " << likelihood_value << std::flush;
-            std::cout << ", parameters: " << parameters.transpose() << std::flush;
-
-            VectorType likelihood_update = gl->GetParameterDerivatives(gp);
-            //std::cout << ", gradient: " << update.transpose() << std::endl;
-
-            if(likelihood_update.rows()!=parameters.rows()){
-                std::cout << "[failed] Wrong number of parameters" << std::endl;
+                double likelihood = (*gl)(gp)[0];
+                if(likelihood > likelihood_max){
+                    likelihood_max = likelihood;
+                    sigma_max = sigma;
+                    scale_max = scale;
+                }
             }
-
-            for(unsigned p=0; p<parameters.rows(); p++){
-                parameters[p] -= lambda * likelihood_update[p];
+            catch(std::string& s){
+                std::cout << "[failed] " << s << std::endl;
+                return;
             }
-
-
-            std::cout << ", likelihood_update: " << likelihood_update.transpose() << std::endl;
-
-            gp->SetKernel(GetKernel(parameters));
-        }
-        catch(std::string& s){
-            std::cout << "Error: " << s << std::endl;
-            break;
-            //return;
         }
     }
-
-    std::cout << "Parameters are: " << parameters.transpose() << std::endl;
-    std::cout << "\"\"\"" << std::endl;
-    //return;
 
     std::vector<double> prediction_y;
     std::vector<double> prediction_x;
     // predict some stuff:
-    for(unsigned i=80; i<3000; i++){
-        VectorType x = VectorType::Zero(1); x[0] = i;
+    for(unsigned i=0; i<100; i++){
+        VectorType x = VectorType::Zero(1); x[0] = signal(0,i);
         prediction_y.push_back(gp->Predict(x)[0]);
-        prediction_x.push_back(i);
+        prediction_x.push_back(signal(0,i));
     }
 
-    std::cout << "p=np.array([";
-    for(unsigned i=0; i<prediction_y.size(); i++){
-        std::cout << prediction_y[i] << ", " << std::flush;
+    double err = 0;
+    for(unsigned i=0; i<prediction_x.size(); i++ ){
+        err += std::abs(prediction_y[i]-signal(1,i));
     }
-    std::cout << "])" << std::endl;
-    std::cout << "x=np.array([";
-    for(unsigned i=0; i<prediction_x.size(); i++){
-        std::cout << prediction_x[i] << ", " << std::flush;
-    }
-    std::cout << "])" << std::endl;
-    std::cout << "gty=np.array([";
-    for(unsigned i=0; i<signal.cols(); i++){
-        std::cout << signal(1,i) << ", " << std::flush;
-    }
-    std::cout << "])" << std::endl;
-    std::cout << "gtx=np.array([";
-    for(unsigned i=0; i<signal.cols(); i++){
-        std::cout << i << ", " << std::flush;
-    }
-    std::cout << "])" << std::endl;
-    std::cout << "hx = plt.plot(gtx,gty,'-b', label='ground truth')" << std::endl;
-    std::cout << "hx = plt.plot(x,p,'-r', label='prediction')" << std::endl;
 
-    std::stringstream ss;
-    ss << ", likelihood: " << likelihood_value << "\\n";
-    ss << parameters.transpose();
-    std::cout << "plt.title(\"" << ss.str() << "\")" << std::endl;
-    std::cout << "plt.legend()" << std::endl;
-    std::cout << "plt.show()" << std::endl;
+    if(err/prediction_x.size() < 2){
+        std::cout << "[passed]" << std::endl;
+    }
+    else{
+        std::cout << "[failed]" << std::endl;
+    }
 }
 
+void Test2(){
+    /*
+     * Test 2: perform maximum likelihood
+     *      - try to infer a squared function
+     *      - maximum is searched by brute force
+     */
+    std::cout << "Test 2: maximum log gaussian likelihood (gradient descent)... " << std::flush;
+
+    typedef GaussianProcessType::VectorType VectorType;
+    typedef GaussianProcessType::MatrixType MatrixType;
+
+    // generating a signal
+    // ground truth periodic variable
+    //auto f = [](double x)->double { return 400*std::sin(1.5*x) + x*x; };
+    auto f = [](double x)->double { return x*x; };
+
+    double val = 0;
+    unsigned n = 100;
+    MatrixType signal = MatrixType::Zero(2,n);
+    for(unsigned i=0; i<n; i++){
+        signal(0,i) = val;
+        signal(1,i) = f(val);
+        val += 100.0/n;
+    }
+
+    // build Gaussian process and add the 1D samples
+    WhiteKernelTypePointer pk(new WhiteKernelType(0)); // dummy kernel
+    GaussianProcessTypePointer gp(new GaussianProcessType(pk));
+    gp->SetSigma(0.001); // zero since with the white kernel (see later) this is considered
+
+    for(unsigned i=0; i<10; i++){
+        VectorType x = VectorType::Zero(1); x[0] = signal(0,i);
+        VectorType y = VectorType::Zero(1); y[0] = signal(1,i);
+        gp->AddSample(x,y);
+    }
+
+    for(unsigned i=80; i<90; i++){
+        VectorType x = VectorType::Zero(1); x[0] = signal(0,i);
+        VectorType y = VectorType::Zero(1); y[0] = signal(1,i);
+        gp->AddSample(x,y);
+    }
+
+
+    // construct Gaussian log likelihood
+    typedef gpr::GaussianLogLikelihood<double> GaussianLogLikelihoodType;
+    typedef std::shared_ptr<GaussianLogLikelihoodType> GaussianLogLikelihoodTypePointer;
+    GaussianLogLikelihoodTypePointer gl(new GaussianLogLikelihoodType());
+
+
+    double sigma = 20;
+    double scale = 100;
+    double lambda = 1e-3;
+    for(unsigned i=0; i<1000; i++){
+        // analytical
+        try{
+            GaussianKernelTypePointer gk(new GaussianKernelType(sigma, scale));
+            gp->SetKernel(gk);
+
+            VectorType likelihood_update = gl->GetParameterDerivatives(gp);
+
+            sigma -= lambda * likelihood_update[0];
+            scale -= lambda * likelihood_update[1];
+        }
+        catch(std::string& s){
+            std::cout << "[failed] " << s << std::endl;
+            return;
+        }
+    }
+
+
+    std::vector<double> prediction_y;
+    std::vector<double> prediction_x;
+    // predict some stuff:
+    for(unsigned i=0; i<100; i++){
+        VectorType x = VectorType::Zero(1); x[0] = signal(0,i);
+        prediction_y.push_back(gp->Predict(x)[0]);
+        prediction_x.push_back(signal(0,i));
+    }
+
+    double err = 0;
+    for(unsigned i=0; i<prediction_x.size(); i++ ){
+        err += std::abs(prediction_y[i]-signal(1,i));
+    }
+
+    if(err/prediction_x.size() < 5){
+        std::cout << "[passed]" << std::endl;
+    }
+    else{
+        std::cout << "[failed]" << std::endl;
+    }
+}
+
+void Test3(){
+    /*
+     * Test 3: perform maximum likelihood
+     *      - try to infer a periodic function
+     *      - maximum is searched by brute force
+     */
+    std::cout << "Test 3: maximum log gaussian likelihood (brute force)... " << std::flush;
+
+    typedef GaussianProcessType::VectorType VectorType;
+    typedef GaussianProcessType::MatrixType MatrixType;
+
+    // generating a signal
+    // ground truth periodic variable
+    auto f = [](double x)->double { return 400*std::sin(1.5*x); };
+
+    double val = 0;
+    unsigned n = 200;
+    MatrixType signal = MatrixType::Zero(2,n);
+    for(unsigned i=0; i<n; i++){
+        signal(0,i) = val;
+        signal(1,i) = f(val);
+        val += 50.0/n;
+    }
+
+    // build Gaussian process and add the 1D samples
+    WhiteKernelTypePointer pk(new WhiteKernelType(0)); // dummy kernel
+    GaussianProcessTypePointer gp(new GaussianProcessType(pk));
+    gp->SetSigma(0.001); // zero since with the white kernel (see later) this is considered
+
+    for(unsigned i=0; i<20; i++){
+        VectorType x = VectorType::Zero(1); x[0] = signal(0,i);
+        VectorType y = VectorType::Zero(1); y[0] = signal(1,i);
+        gp->AddSample(x,y);
+    }
+
+    for(unsigned i=80; i<100; i++){
+        VectorType x = VectorType::Zero(1); x[0] = signal(0,i);
+        VectorType y = VectorType::Zero(1); y[0] = signal(1,i);
+        gp->AddSample(x,y);
+    }
+
+
+    // construct Gaussian log likelihood
+    typedef gpr::GaussianLogLikelihood<double> GaussianLogLikelihoodType;
+    typedef std::shared_ptr<GaussianLogLikelihoodType> GaussianLogLikelihoodTypePointer;
+    GaussianLogLikelihoodTypePointer gl(new GaussianLogLikelihoodType());
+
+
+    //double period = M_PI/15;
+    double sigma = 1;
+    double scale = 400;
+    double likelihood_max = std::numeric_limits<double>::lowest();
+    double period_max = 0;
+    for(double period=0; period<2*M_PI; period+=0.001){
+        // analytical
+        try{
+            PeriodicKernelTypePointer gk(new PeriodicKernelType(scale, period, sigma));
+            gp->SetKernel(gk);
+
+            double likelihood= (*gl)(gp)[0];
+            if(likelihood > likelihood_max){
+                likelihood_max = likelihood;
+                period_max = period;
+            }
+        }
+        catch(std::string& s){
+            std::cout << "[failed] " << s << std::endl;
+            return;
+        }
+    }
+
+
+    PeriodicKernelTypePointer gk(new PeriodicKernelType(scale, period_max, sigma));
+    gp->SetKernel(gk);
+
+    std::vector<double> prediction_y;
+    std::vector<double> prediction_x;
+    // predict some stuff:
+    for(unsigned i=0; i<signal.cols(); i++){
+        VectorType x = VectorType::Zero(1); x[0] = signal(0,i);
+        prediction_y.push_back(gp->Predict(x)[0]);
+        prediction_x.push_back(signal(0,i));
+    }
+
+    double err = 0;
+    for(unsigned i=0; i<prediction_x.size(); i++ ){
+        err += std::abs(prediction_y[i]-signal(1,i));
+    }
+
+    if(err/prediction_x.size() < 1e-5){
+        std::cout << "[passed]" << std::endl;
+    }
+    else{
+        std::cout << "[failed]" << std::endl;
+    }
+}
 
 int main (int argc, char *argv[]){
-    std::cout << "import numpy as np" << std::endl;
-    std::cout << "import pylab as plt" << std::endl;
-    std::cout << "\"\"\"" << std::endl;
     std::cout << "Gaussian likelihood kernel test: " << std::endl;
     try{
-    Test1();
+        Test1();
+        Test2();
+        Test3();
     }
     catch(std::string& s){
         std::cout << "Error: " << s << std::endl;

@@ -19,6 +19,7 @@
 
 #include <string>
 #include <cmath>
+#include <climits>
 #include <memory>
 
 #include "GaussianProcess.h"
@@ -92,13 +93,23 @@ public:
         VectorType df = -0.5 * (Y.adjoint() * C * Y);
 
         // complexity penalty
-        if(determinant <= 0){
-            throw std::string("GaussianLogLikelihood: determinant of K is smaller or equal to zero.");
+        if(determinant < -std::numeric_limits<double>::epsilon()){
+            std::stringstream ss;
+            ss << "GaussianLogLikelihood: determinant of K is smaller than zero: " << determinant;
+            throw ss.str();
         }
-        TScalarType cp = -0.5 * std::log(determinant);
+        TScalarType cp;
+
+        if(determinant <= 0){
+            cp = -0.5 * std::log(std::numeric_limits<double>::min());
+        }
+        else{
+            cp = -0.5 * std::log(determinant);
+        }
+
 
         // constant term
-        TScalarType ct = -C.rows()/2 * std::log(2*M_PI);
+        TScalarType ct = -C.rows()/2.0 * std::log(2*M_PI);
 
         return df.array() + (cp + ct);
     }

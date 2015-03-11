@@ -386,8 +386,8 @@ public:
 
         TScalarType r = (x-y).norm();
         TScalarType f = std::exp(-0.5 * (r*r) / (m_Sigma2));
-        D[0] = m_Scale2 * (r*r) / (m_Sigma3) * f;
-        D[1] = 2*m_Scale * f;
+        D[0] = m_Scale2 * (r*r) / (m_Sigma3) * f; // to sigma
+        D[1] = 2*m_Scale * f; // to scale
         return D;
     }
 
@@ -646,26 +646,25 @@ public:
         TScalarType f1 = 0;
         for(unsigned i=0; i<x.rows(); i++){
             double r = std::sin(m_B*(x[i] - y[i]));
-            f1 += r*r / m_Sigma2;
+            f1 += r*r;
         }
 
         TScalarType f2 = 0;
         for(unsigned i=0; i<x.rows(); i++){
             double r = (x[i] - y[i]);
-            double v = 2*r * std::cos(m_B*r) * std::sin(m_B*r);
-            f2 += v / m_Sigma2;
+            f2 += 2*r * std::cos(m_B*r) * std::sin(m_B*r);
         }
 
         TScalarType f3 = 0;
         for(unsigned i=0; i<x.rows(); i++){
             double r = (x[i] - y[i]);
             double v = std::sin(m_B*r);
-            f3 += -2* (v*v) / m_Sigma3;
+            f3 += (v*v);
         }
 
-        D[0] = 2*m_Scale * std::exp(-0.5*f1);
-        D[1] = -0.5 * m_Scale2 * std::exp(-0.5*f1) * f2;
-        D[2] = -0.5 * m_Scale2 * std::exp(-0.5*f1) * f3;
+        D[0] = 2*m_Scale * std::exp(-0.5*f1/m_Sigma2);
+        D[1] = -0.5 * m_Scale2 * std::exp(-0.5*f1/m_Sigma2) * f2 / m_Sigma2;
+        D[2] = m_Scale2 * std::exp(-0.5*f1/m_Sigma2) * f3 / m_Sigma3;
         return D;
     }
 

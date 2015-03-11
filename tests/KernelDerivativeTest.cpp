@@ -258,7 +258,7 @@ void Test4(){
         }
     }
 
-    if(err[0]/counter < 1e-13 && err[1]/counter < 1e-3 && err[2]/counter < 0.001){
+    if(err[0]/counter < 1e-13 && err[1]/counter < 1e-5 && err[2]/counter < 0.001){
         std::cout << "\t[passed]." << std::endl;
     }
     else{
@@ -360,8 +360,8 @@ void Test5(){
     if(err[0]/counter < 0.005 &&
             err[1]/counter < 1e-11 &&
             err[2]/counter < 1e-11 &&
-            err[2]/counter < 1e-5 &&
-            err[2]/counter < 1e-3){
+            err[3]/counter < 1e-6 &&
+            err[4]/counter < 1e-4){
         std::cout << "\t[passed]." << std::endl;
     }
     else{
