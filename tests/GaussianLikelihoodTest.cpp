@@ -77,24 +77,36 @@ void Test1(){
     typedef GaussianProcessType::VectorType VectorType;
     typedef GaussianProcessType::MatrixType MatrixType;
 
-    MatrixType signal;
-    try{
-        signal = gpr::ReadMatrix<MatrixType>("/home/jud/Projects/GaussianProcessRegression/install/data/breathing1D.mat");
-    }
-    catch(...){
-        std::cout << "[failed] could not read ../data/breathing1D.mat" << std::endl;
-        return;
+    // generating a signal
+    // ground truth periodic variable
+    auto f = [](double x)->double { return 400*std::sin(1.5*x) + x*x; };
+
+    double val = 0;
+    unsigned n = 400;
+    MatrixType signal = MatrixType::Zero(2,n);
+    for(unsigned i=0; i<n; i++){
+        signal(0,i) = val;
+        signal(1,i) = f(val);
+        val += 100.0/n;
     }
 
+    std::default_random_engine g(static_cast<unsigned int>(std::time(0)));
+    std::normal_distribution<double> dist(0, 1);
 
     // build Gaussian process and add the 1D samples
     WhiteKernelTypePointer pk(new WhiteKernelType(0)); // dummy kernel
     GaussianProcessTypePointer gp(new GaussianProcessType(pk));
     gp->SetSigma(0); // zero since with the white kernel (see later) this is considered
 
-    for(unsigned i=80; i<700; i++){
-        VectorType x = VectorType::Zero(1); x[0] = i;
-        VectorType y = VectorType::Zero(1); y[0] = signal(0,i);
+    for(unsigned i=0; i<80; i++){
+        VectorType x = VectorType::Zero(1); x[0] = signal(0,i);
+        VectorType y = VectorType::Zero(1); y[0] = signal(1,i);// + dist(g);
+        gp->AddSample(x,y);
+    }
+
+    for(unsigned i=120; i<160; i++){
+        VectorType x = VectorType::Zero(1); x[0] = signal(0,i);
+        VectorType y = VectorType::Zero(1); y[0] = signal(1,i);// + dist(g);
         gp->AddSample(x,y);
     }
     //gp->DebugOn();
@@ -106,51 +118,45 @@ void Test1(){
 
 
     // mean estimate of periodicity parameter
-    double p_estimate =  gpr::GetLocalPeriodLength<double>(signal.transpose(), 10);
+    double p_estimate =  gpr::GetLocalPeriodLength<double>(signal.block(0,1,80,1).transpose(), 5);
+    std::cout << "Period estimate: " << p_estimate << std::endl;
 
 
     /*
      * construct/define prior over the parameters
      *   - GammaDensity to sample parameters
-     *   -LogGammaDensity to evaluate prior for the posterior
      */
     std::vector< std::pair< std::string, std::pair<double,double> > > pdf_params;
-    pdf_params.push_back(std::make_pair("WScale", std::make_pair(4, 1))); // white kernel
-    pdf_params.push_back(std::make_pair("PPeriod", std::make_pair(p_estimate/0.5, 0.5))); // period kernel
-    pdf_params.push_back(std::make_pair("PScale", std::make_pair(5 ,2)));
-    pdf_params.push_back(std::make_pair("PSigma", std::make_pair(3, 1.5)));
-    pdf_params.push_back(std::make_pair("GScale", std::make_pair(10, 0.3))); // gaussian kernel
-    pdf_params.push_back(std::make_pair("GSigma", std::make_pair(10, 0.3)));
 
+    pdf_params.push_back(std::make_pair("WScale", std::make_pair(2*2*2/2,2))); // white kernel
+    pdf_params.push_back(std::make_pair("PPeriod", std::make_pair(p_estimate*p_estimate/4, p_estimate))); // period kernel
+    pdf_params.push_back(std::make_pair("PScale", std::make_pair(400*400*400/50,50)));
+    pdf_params.push_back(std::make_pair("PSigma", std::make_pair(2*2*2/2,2)));
+    pdf_params.push_back(std::make_pair("GScale", std::make_pair(2*2*2/4,2))); // gaussian kernel
+    pdf_params.push_back(std::make_pair("GSigma", std::make_pair(40*40*40/25,40)));
 
-    typedef gpr::GammaDensity<double>          GammaDensityType;
-    typedef gpr::LogGammaDensity<double>       LogGammaDensityType;
-    typedef gpr::GaussianDensity<double>        GaussianDensityType;
-    typedef gpr::LogGaussianDensity<double>     LogGaussianDensityType;
+//   typedef gpr::GammaDensity<double>           DensityType;
+//    typedef gpr::GaussianDensity<double>        DensityType;
+    typedef gpr::InverseGaussianDensity<double>        DensityType;
 
-    std::vector< std::pair<std::string, GammaDensityType*> > pdfs;
+    std::vector< std::pair<std::string, DensityType*> > pdfs;
     for(auto const &p : pdf_params){
-        pdfs.push_back(std::make_pair(p.first, new GammaDensityType(p.second.first, p.second.second)));
+        pdfs.push_back(std::make_pair(p.first, new DensityType(p.second.first, p.second.second)));
     }
 
-    std::vector< std::pair<std::string, LogGammaDensityType*> > logpdfs;
-    for(auto const &p : pdf_params){
-        logpdfs.push_back(std::make_pair(p.first, new LogGammaDensityType(p.second.first, p.second.second)));
-    }
 
-        // initial kernel
+    // initial kernel
     VectorType parameters = VectorType::Zero(pdf_params.size());
     for(unsigned i=0; i<parameters.rows(); i++){
-        parameters[i] = (*pdfs[i].second)();
+        parameters[i] = (*pdfs[i].second).mean();
     }
 
     gp->SetKernel(GetKernel(parameters));
 
+
+
     // begin optimization
-    double lambda = 0.011;
-    double w = 0.5; // trade off likelihood and prior: 1 -> only likelihood, 0 -> only prior
-    if(w>1) w=1;
-    if(w<0) w=0;
+    double lambda = 0.000001;
 
 
     double likelihood_value, prior_value;
@@ -159,7 +165,8 @@ void Test1(){
         try{
 
             likelihood_value = (*gl)(gp)[0];
-            std::cout << "Iteration: " << i << ", likelihood: " << w*likelihood_value;
+            std::cout << "Iteration: " << i << ", likelihood: " << likelihood_value << std::flush;
+            std::cout << ", parameters: " << parameters.transpose() << std::flush;
 
             VectorType likelihood_update = gl->GetParameterDerivatives(gp);
             //std::cout << ", gradient: " << update.transpose() << std::endl;
@@ -167,30 +174,13 @@ void Test1(){
             if(likelihood_update.rows()!=parameters.rows()){
                 std::cout << "[failed] Wrong number of parameters" << std::endl;
             }
-            if(logpdfs.size() != parameters.rows()){
-                std::cout << "[failed] wrong number of parameters or prior" << std::endl;
-            }
-
-            VectorType prior_update = VectorType::Zero(parameters.rows());
-            for(unsigned p=0; p<parameters.rows(); p++){
-                prior_update[p] = logpdfs[p].second->GetDerivative(parameters[p]);
-            }
-
-            prior_value = 0;
-            for(unsigned p=0; p<pdfs.size(); p++){
-                prior_value += (*pdfs[p].second)(parameters[p]);
-            }
 
             for(unsigned p=0; p<parameters.rows(); p++){
-                double gradient = w * likelihood_update[p] + (1-w) * prior_update[p];
-                parameters[p] -= lambda * gradient;
+                parameters[p] -= lambda * likelihood_update[p];
             }
 
-            std::cout << ", prior: " << (1-w) * prior_value << std::flush;
 
-            std::cout << ", parameters: " << parameters.transpose() << std::flush;
-            std::cout << ", likelihood_update: " << likelihood_update.transpose() << std::flush;
-            std::cout << ", prior_update: " << prior_update.transpose() << std::endl;
+            std::cout << ", likelihood_update: " << likelihood_update.transpose() << std::endl;
 
             gp->SetKernel(GetKernel(parameters));
         }
@@ -226,7 +216,7 @@ void Test1(){
     std::cout << "])" << std::endl;
     std::cout << "gty=np.array([";
     for(unsigned i=0; i<signal.cols(); i++){
-        std::cout << signal(0,i) << ", " << std::flush;
+        std::cout << signal(1,i) << ", " << std::flush;
     }
     std::cout << "])" << std::endl;
     std::cout << "gtx=np.array([";
@@ -238,8 +228,7 @@ void Test1(){
     std::cout << "hx = plt.plot(x,p,'-r', label='prediction')" << std::endl;
 
     std::stringstream ss;
-    ss << "prior: " << (1-w) * prior_value << "\\n";
-    ss << ", likelihood: " << w*likelihood_value << "\\n";
+    ss << ", likelihood: " << likelihood_value << "\\n";
     ss << parameters.transpose();
     std::cout << "plt.title(\"" << ss.str() << "\")" << std::endl;
     std::cout << "plt.legend()" << std::endl;

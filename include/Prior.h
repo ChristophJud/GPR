@@ -21,6 +21,7 @@
 #include <string>
 #include <complex>
 #include <random>
+#include <ctime>
 
 namespace gpr {
 
@@ -34,17 +35,19 @@ public:
     Density(){}
     virtual ~Density(){}
 
+    virtual TScalarType mean() = 0;
+    virtual TScalarType variance() = 0;
 
     static std::default_random_engine g;
 };
 template<class TScalarType>
-std::default_random_engine Density<TScalarType>::g;
+std::default_random_engine Density<TScalarType>::g(static_cast<unsigned int>(std::time(0)));
 
 
 /*
  * Gaussian Density: to evaluate the distribution at a point x
  *
- * p(x|lambda,mu) = (lambda/(2pi x^3)^(0.5) exp(-lambda(x-mu)^2/(2mu^2 x))
+ * p(x|mu,sigma) =
  *
  */
 template<class TScalarType>
@@ -63,46 +66,24 @@ public:
         return normal_dist(Density<TScalarType>::g);
     }
 
+    TScalarType GetDerivative(TScalarType x){
+        return -(x-mu) * std::exp(-(x-mu)*(x-mu)/(2*sigma*sigma)) / (std::sqrt(2)*std::sqrt(M_PI)*sigma*sigma*sigma);
+    }
+
+    TScalarType mean(){
+        return mu;
+    }
+
+    TScalarType variance(){
+        return sigma;
+    }
+
 private:
     TScalarType mu;
     TScalarType sigma;
     std::normal_distribution<TScalarType> normal_dist;
 };
 
-/*
- * Log Gaussian Density: to evaluate the distribution at a point x
- *
- * p(x|lambda,mu) = (lambda/(2pi x^3)^(0.5) exp(-lambda(x-mu)^2/(2mu^2 x))
- *
- */
-template<class TScalarType>
-class LogGaussianDensity : public Density<TScalarType>{
-public:
-    LogGaussianDensity(TScalarType mu, TScalarType sigma) : mu(mu), sigma(sigma) {
-        if(sigma<=0) throw std::string("LogGaussianDensity: the log Gaussian density is only defined for sigma>0");
-        dist = std::lognormal_distribution<TScalarType>(mu, sigma);
-    }
-    ~LogGaussianDensity(){}
-    TScalarType operator()(TScalarType x){
-        if(x<=0) throw std::string("LogGaussianDensity: the log Gaussian density is only defined for x > 0");
-        return 1/(x*sigma*std::sqrt(2*M_PI)) * std::exp(-(std::log(x)-mu)*(std::log(x)-mu)/(2*sigma*sigma));
-    }
-
-    TScalarType operator()(){
-        return dist(Density<TScalarType>::g);
-    }
-
-    TScalarType GetDerivative(TScalarType x){
-        if(x<=0) throw std::string("LogGaussianDensity: the derivative of the log Gaussian density is only defined for x > 0");
-        double f1 = std::exp(-(std::log(x)-mu)*(std::log(x)-mu)/(2*sigma*sigma));
-        return -f1 * (std::log(x)-mu) / (std::sqrt(2)*std::sqrt(M_PI)*sigma*sigma*sigma*x*x) - f1 / (std::sqrt(2)*std::sqrt(M_PI)*sigma*x*x);
-    }
-
-private:
-    TScalarType mu;
-    TScalarType sigma;
-    std::lognormal_distribution<TScalarType> dist;
-};
 
 /*
  * Inverse Gaussian Density: to evaluate the distribution at a point x
@@ -138,36 +119,19 @@ public:
         }
     }
 
+    TScalarType mean(){
+        return mu;
+    }
+
+    TScalarType variance(){
+        return mu*mu*mu/lambda;
+    }
+
 private:
     TScalarType lambda;
     TScalarType mu;
     std::normal_distribution<TScalarType> normal_dist;
     std::uniform_real_distribution<TScalarType> uniform_dist;
-};
-
-/*
- * Log Inverse Gaussian Density: needed for maximum likelihood
- *
- * p(x|lambda,mu) = (lambda/(2pi x^3)^(0.5) exp(-lambda(x-mu)^2/(2mu^2 x))
- *
- */
-template<class TScalarType>
-class LogInverseGaussianDensity : public Density<TScalarType>{
-public:
-    LogInverseGaussianDensity(TScalarType lambda, TScalarType mu) : lambda(lambda), mu(mu) {
-        if(lambda<=0 || mu<=0) throw std::string("InverseGaussianDensity: the inverse Gaussian density is only defined for lambda>0 and mu>0");
-    }
-    ~LogInverseGaussianDensity(){}
-    TScalarType operator()(TScalarType x){
-        if(x<=0) throw std::string("LogInverseGaussianDensity: domain error. The inverse Gaussian density is not defined for x<=0.");
-        if(x==1) throw std::string("LogInverseGaussianDensity: domain error. The log inverse Gaussian density is not defined for x==1.");
-        double logx = std::log(x);
-        return std::abs(1/x) * std::sqrt(1/(2*M_PI*logx*logx*logx)) * std::exp(-lambda*(logx-mu)*(logx-mu)/(2*mu*mu*logx));
-    }
-
-private:
-    TScalarType lambda;
-    TScalarType mu;
 };
 
 
@@ -201,60 +165,19 @@ public:
         return distribution(Density<TScalarType>::g);
     }
 
+    TScalarType mean(){
+        return alpha/beta;
+    }
+
+    TScalarType variance(){
+        return alpha/(beta*beta);
+    }
+
 private:
     TScalarType alpha;
     TScalarType beta;
     TScalarType factor;
     std::gamma_distribution<TScalarType> distribution;
-};
-
-/*
- * Log Gamma Density: to evaluate the distribution at a point x
- *
- * p(x|alpha,beta) = 1/(beta^alpha * gamma(alpha)) * log(x)^{alpha-1} * exp(-log(x)/beta)
- *
- */
-template<class TScalarType>
-class LogGammaDensity : public Density<TScalarType>{
-public:
-    LogGammaDensity(TScalarType alpha, TScalarType beta) : alpha(alpha), beta(beta) {
-        if(alpha<=0 || beta<=0) throw std::string("LogGammaDensity: the log Gamma density is only defined for alpha>0 and beta>0");
-        factor = std::pow(beta,alpha) * std::tgamma(alpha);
-    }
-    ~LogGammaDensity(){}
-    TScalarType operator()(TScalarType x){
-        if(x==1 && alpha<1) throw std::string("LogGammaDensity: domain error. For alpha<1 and x==0 the log Gamma density is not defined.");
-        if(x<=0) throw std::string("LogGammaDensity: domain error. The log Gamma density is not defined for x<=0.");
-
-        // compute log power
-        std::complex<TScalarType> logx(std::log(x));
-        std::complex<TScalarType> alphamin1(alpha-1);
-
-        return std::abs(std::pow(logx,alphamin1)) / (x*factor) * std::exp(-std::log(x)/beta);
-    }
-    TScalarType GetDerivative(TScalarType x){
-        if(x==1 && alpha<2) throw std::string("LogGammaDensity: domain error. For alpha<2 and x==0 the derivative of log Gamma density is not defined.");
-        if(x<=0) throw std::string("LogGammaDensity: domain error. The log Gamma density is not defined for x<=0.");
-
-        // compute log power
-        std::complex<TScalarType> logx(std::log(x));
-        std::complex<TScalarType> alphamin1(alpha-1);
-        std::complex<TScalarType> alphamin2(alpha-2);
-
-        TScalarType f1 = std::abs(std::pow(logx,alphamin1));
-        TScalarType f2 = std::abs(std::pow(logx,alphamin2));
-
-        TScalarType summand1 = (alpha-1)*std::exp(-std::log(x)/beta)*f2 / (factor*x*x);
-        TScalarType summand2 = -std::pow(beta,-alpha-1)*std::exp(-std::log(x)/beta)*f1 / (std::tgamma(alpha)*x*x);
-        TScalarType summand3 = -std::exp(-std::log(x)/beta)*f1/(factor*x*x);
-
-        return summand1 + summand2 + summand3;
-    }
-
-private:
-    TScalarType alpha;
-    TScalarType beta;
-    TScalarType factor;
 };
 
 }

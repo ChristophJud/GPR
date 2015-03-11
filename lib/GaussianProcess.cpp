@@ -427,6 +427,7 @@ TScalarType GaussianProcess<TScalarType>::ComputeCoreMatrix(typename GaussianPro
 
     if(debug){
         std::cout << "GaussianProcess::ComputeCoreMatrix: inversion error: " << (K*C - MatrixType::Identity(K.rows(),K.cols())).norm() << std::endl;
+        std::cout << "GaussianProcess::ComputeCoreMatrix: determinant of K: " << K.determinant() << std::endl;
     }
     return K.determinant();
 }
