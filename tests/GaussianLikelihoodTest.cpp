@@ -47,25 +47,6 @@ typedef std::shared_ptr<SumKernelType>          SumKernelTypePointer;
 typedef gpr::GaussianProcess<double>            GaussianProcessType;
 typedef std::shared_ptr<GaussianProcessType>    GaussianProcessTypePointer;
 
-// constructs a kernel based on randomly sampled parameters
-// the kernel is:
-// Gaussian + Periodic + White
-// (each parameter is Gamma distributed
-
-// parameters[0] = wscale();
-// parameters[1] = pperiod();
-// parameters[2] = pscale();
-// parameters[3] = psigma();
-// parameters[4] = gscale();
-// parameters[5] = gsigma();
-KernelTypePointer GetKernel(const GaussianProcessType::VectorType& parameters){
-    GaussianKernelTypePointer gk(new GaussianKernelType(parameters[1], parameters[0]));
-    //PeriodicKernelTypePointer pk(new PeriodicKernelType(parameters[2], parameters[1], parameters[3]));
-    //SumKernelTypePointer sk(new SumKernelType(gk,pk));
-    //WhiteKernelTypePointer wk(new WhiteKernelType(parameters[0]));
-    //SumKernelTypePointer kernel(new SumKernelType(sk,wk));
-    return gk;
-}
 
 void Test1(){
     /*
