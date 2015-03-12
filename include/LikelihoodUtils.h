@@ -16,6 +16,7 @@
  */
 
 #pragma once
+#include <utility> // std::pair
 
 #include <unsupported/Eigen/FFT>
 
@@ -28,7 +29,8 @@ namespace gpr{
 // - the function can be used to roughly estimate the period
 //   hyperparameter of the periodic kernel
 template<class TScalarType>
-TScalarType GetLocalPeriodLength(const typename GaussianProcess<TScalarType>::VectorType &vec, unsigned ommit=1){
+std::tuple<TScalarType, TScalarType, TScalarType> // (period length, dominant amplitude, sinuns likeness)
+GetLocalPeriodLength(const typename GaussianProcess<TScalarType>::VectorType &vec, unsigned ommit=1){
     unsigned interval_size = vec.rows();
 
     Eigen::FFT<float> fft;
@@ -42,16 +44,31 @@ TScalarType GetLocalPeriodLength(const typename GaussianProcess<TScalarType>::Ve
     fft.fwd(f, t);
 
     unsigned max_index = 0;
-    float max = std::numeric_limits<float>::lowest();
+    float amp_max = std::numeric_limits<float>::lowest();
+    float amp_integral = 0;
     for(unsigned i=ommit; i<interval_size/2; i++){
-        float amp = std::abs(f[i]);
-        if(amp>max){
-            max = amp;
+        float amp = 2*std::abs(f[i])/interval_size;
+        if(amp>amp_max){
+            amp_max = amp;
             max_index = i;
         }
+        amp_integral += amp;
     }
 
-    return static_cast<TScalarType>(interval_size) / static_cast<TScalarType>(max_index);
+    // returns a tuple of
+    // - number of indices per period
+    // - the maximum amplitude
+    // - ration between integral over amps and max amp
+    double period_length = static_cast<TScalarType>(interval_size) / static_cast<TScalarType>(max_index);
+    double amplitude = amp_max;
+    double sinus_likeness;
+    if(amp_integral-amp_max < std::numeric_limits<TScalarType>::min()){
+        sinus_likeness = std::numeric_limits<TScalarType>::max();
+    }
+    else{
+        sinus_likeness = amp_integral/(amp_integral-amp_max);
+    }
+    return std::make_tuple(period_length, amplitude, sinus_likeness);
 }
 
 }

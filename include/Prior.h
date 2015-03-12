@@ -22,6 +22,9 @@
 #include <complex>
 #include <random>
 #include <ctime>
+#include <utility>
+
+#include <boost/math/special_functions/gamma.hpp>
 
 namespace gpr {
 
@@ -31,14 +34,52 @@ template<class TScalarType>
 class Density{
 public:
 
-    virtual TScalarType operator()(TScalarType x) = 0;
+    typedef std::pair<TScalarType, TScalarType> PairType;
+
+    virtual TScalarType operator()(TScalarType x) const = 0;
     Density(){}
     virtual ~Density(){}
 
-    virtual TScalarType mean() = 0;
-    virtual TScalarType variance() = 0;
+    virtual TScalarType cdf(TScalarType x) const = 0;
+    virtual TScalarType mean() const = 0;
+    virtual TScalarType variance() const = 0;
+    virtual TScalarType mode() const = 0;
 
+    TScalarType icdf(TScalarType y){
+        if(y<0 || y>1) throw std::string("Density::icdf: domain error. y is in [0,1]");
+        TScalarType s = 0;
+        TScalarType step = 1;
+        TScalarType old_s = s;
+
+        for(unsigned i=0; i<1000; i++){
+            if(this->cdf(s)<y){
+                step *= 2;
+                s += step;
+            }
+            else{
+                step /= 2;
+                s -= step;
+            }
+            if(std::abs(s-old_s)<1e-6){
+                break;
+            }
+            else{
+                old_s = s;
+            }
+        }
+
+        return reflect(s,this->cdf(s), 1.0, 0.0).second;
+    }
+
+protected:
     static std::default_random_engine g;
+
+private:
+    // reflection line: y = ax + c
+    PairType reflect(TScalarType x, TScalarType y, TScalarType a, TScalarType c){
+        TScalarType d = (x + (y-c)*a)/(1+a*a);
+        return std::make_pair(2*d-x, 2*d*a -y + 2*c);
+    }
 };
 template<class TScalarType>
 std::default_random_engine Density<TScalarType>::g(static_cast<unsigned int>(std::time(0)));
@@ -58,24 +99,32 @@ public:
         normal_dist = std::normal_distribution<TScalarType>(mu, sigma);
     }
     ~GaussianDensity(){}
-    TScalarType operator()(TScalarType x){
+    TScalarType operator()(TScalarType x) const{
         return 1/(sigma*std::sqrt(2*M_PI)) * std::exp(-(x-mu)*(x-mu)/(2*sigma*sigma));
     }
 
-    TScalarType operator()(){
+    TScalarType operator()() const{
         return normal_dist(Density<TScalarType>::g);
     }
 
-    TScalarType GetDerivative(TScalarType x){
+    TScalarType GetDerivative(TScalarType x) const{
         return -(x-mu) * std::exp(-(x-mu)*(x-mu)/(2*sigma*sigma)) / (std::sqrt(2)*std::sqrt(M_PI)*sigma*sigma*sigma);
     }
 
-    TScalarType mean(){
+    TScalarType cdf(TScalarType x) const{
+        return 0.5*(1+std::erf(x-mu)/(sigma*std::sqrt(2)));
+    }
+
+    TScalarType mean() const{
         return mu;
     }
 
-    TScalarType variance(){
+    TScalarType variance() const{
         return sigma;
+    }
+
+    TScalarType mode() const{
+        return mu;
     }
 
 private:
@@ -100,13 +149,14 @@ public:
         uniform_dist = std::uniform_real_distribution<TScalarType>(0, 1);
     }
     ~InverseGaussianDensity(){}
-    TScalarType operator()(TScalarType x){
+    TScalarType operator()(TScalarType x) const{
         if(x<=0) throw std::string("InverseGaussianDensity: domain error. The inverse Gaussian density is not defined for x<=0.");
 
         return std::sqrt(lambda/(2*M_PI*x*x*x)) * std::exp(-lambda*(x-mu)*(x-mu)/(2*mu*mu*x));
     }
 
-    TScalarType operator()(){
+
+    TScalarType operator()() const{
         double v = normal_dist(Density<TScalarType>::g);
         double y = v*v;
         double x = mu+(mu*mu*y)/(2*lambda) - mu/(2*lambda) * std::sqrt(4*mu*lambda*y + (mu*mu)*(y*y));
@@ -119,12 +169,37 @@ public:
         }
     }
 
-    TScalarType mean(){
+    TScalarType cdf(TScalarType x) const{
+        // gaussian cdf
+//        auto g_cdf = [](TScalarType x, TScalarType mu, TScalarType sigma) -> TScalarType {
+//            return  0.5*(1+std::erf((x-mu)/(sigma*std::sqrt(2))));
+//        };
+
+//        return g_cdf(std::sqrt(lambda/x)*(x/mu-1), mu, lambda) +
+//                std::exp(2*lambda/mu) *
+//                g_cdf(-std::sqrt(lambda/x)*(x/mu+1), mu, lambda);
+//        double c=0;
+//        for(double s=1e-10; s<x; s+=0.001){
+//            c+=(*this)(s);
+//        }
+//        return c;
+        GaussianDensity<TScalarType> g(mu,lambda);
+        return g(std::sqrt(lambda/x)*(x/mu-1)) +
+                std::exp(2*lambda/mu) *
+                g(-std::sqrt(lambda/x)*(x/mu+1));
+
+    }
+
+    TScalarType mean() const{
         return mu;
     }
 
-    TScalarType variance(){
+    TScalarType variance() const{
         return mu*mu*mu/lambda;
+    }
+
+    TScalarType mode() const{
+        return mu*(std::sqrt(1+9*mu*mu/(4*lambda*lambda)) - 3*mu/(2*lambda));
     }
 
 private:
@@ -150,7 +225,7 @@ public:
         distribution = std::gamma_distribution<TScalarType>(alpha, beta);
     }
     ~GammaDensity(){}
-    TScalarType operator()(TScalarType x){
+    TScalarType operator()(TScalarType x) const{
         if(x==0 && alpha < 1) throw std::string("GammaDensity: domain error. For alpha < 1 and x==0 the Gamma density is not defined.");
         if(x<0) throw std::string("GammaDensity: domain error. The Gamma density is not defined for x<0.");
 
@@ -161,16 +236,24 @@ public:
         return std::abs(std::pow(cx,alphamin1)) / factor * std::exp(-x/beta);
     }
 
-    TScalarType operator()(){
+    TScalarType operator()() const{
         return distribution(Density<TScalarType>::g);
     }
 
-    TScalarType mean(){
+    TScalarType cdf(TScalarType x) const{
+        return 1/std::tgamma(alpha)*boost::math::tgamma_lower(alpha,beta*x);
+    }
+
+    TScalarType mean() const{
         return alpha/beta;
     }
 
-    TScalarType variance(){
+    TScalarType variance() const{
         return alpha/(beta*beta);
+    }
+
+    TScalarType mode() const{
+        return (alpha-1)/beta;
     }
 
 private:
