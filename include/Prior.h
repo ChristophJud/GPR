@@ -68,7 +68,7 @@ public:
             }
         }
 
-        return reflect(s,this->cdf(s), 1.0, 0.0).first;
+        return reflect(s,this->cdf(s), 1.0, 0.0).second;
     }
 
 protected:
