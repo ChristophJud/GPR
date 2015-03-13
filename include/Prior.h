@@ -183,10 +183,10 @@ public:
 //            c+=(*this)(s);
 //        }
 //        return c;
-        GaussianDensity<TScalarType> g(mu,lambda);
-        return g(std::sqrt(lambda/x)*(x/mu-1)) +
+        GaussianDensity<TScalarType> g(0,1);
+        return g.cdf(std::sqrt(lambda/x)*(x/mu-1)) +
                 std::exp(2*lambda/mu) *
-                g(-std::sqrt(lambda/x)*(x/mu+1));
+                g.cdf(-std::sqrt(lambda/x)*(x/mu+1));
 
     }
 
