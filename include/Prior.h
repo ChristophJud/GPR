@@ -23,6 +23,7 @@
 #include <random>
 #include <ctime>
 #include <utility>
+#include <functional>
 
 #include <boost/math/special_functions/gamma.hpp>
 
@@ -45,13 +46,15 @@ public:
     virtual TScalarType variance() const = 0;
     virtual TScalarType mode() const = 0;
 
-    TScalarType icdf(TScalarType y){
+    virtual std::string ToString() const = 0;
+
+    TScalarType icdf(TScalarType y) const{
         if(y<0 || y>1) throw std::string("Density::icdf: domain error. y is in [0,1]");
         TScalarType s = 0;
         TScalarType step = 1;
         TScalarType old_s = s;
 
-        for(unsigned i=0; i<1000; i++){
+        for(unsigned i=0; i<1000; i++){;
             if(this->cdf(s)<y){
                 step *= 2;
                 s += step;
@@ -60,7 +63,7 @@ public:
                 step /= 2;
                 s -= step;
             }
-            if(std::abs(s-old_s)<1e-6){
+            if(std::abs(s-old_s)<1e-14){
                 break;
             }
             else{
@@ -68,7 +71,7 @@ public:
             }
         }
 
-        return reflect(s,this->cdf(s), 1.0, 0.0).second;
+        return s;// reflect(s,this->cdf(s), 1.0, 0.0).second;
     }
 
 protected:
@@ -76,7 +79,7 @@ protected:
 
 private:
     // reflection line: y = ax + c
-    PairType reflect(TScalarType x, TScalarType y, TScalarType a, TScalarType c){
+    PairType reflect(TScalarType x, TScalarType y, TScalarType a, TScalarType c) const{
         TScalarType d = (x + (y-c)*a)/(1+a*a);
         return std::make_pair(2*d-x, 2*d*a -y + 2*c);
     }
@@ -127,6 +130,10 @@ public:
         return mu;
     }
 
+    std::string ToString() const{
+        return std::string("GaussianDensity");
+    }
+
 private:
     TScalarType mu;
     TScalarType sigma;
@@ -170,19 +177,6 @@ public:
     }
 
     TScalarType cdf(TScalarType x) const{
-        // gaussian cdf
-//        auto g_cdf = [](TScalarType x, TScalarType mu, TScalarType sigma) -> TScalarType {
-//            return  0.5*(1+std::erf((x-mu)/(sigma*std::sqrt(2))));
-//        };
-
-//        return g_cdf(std::sqrt(lambda/x)*(x/mu-1), mu, lambda) +
-//                std::exp(2*lambda/mu) *
-//                g_cdf(-std::sqrt(lambda/x)*(x/mu+1), mu, lambda);
-//        double c=0;
-//        for(double s=1e-10; s<x; s+=0.001){
-//            c+=(*this)(s);
-//        }
-//        return c;
         if(x<0) return 0;
         GaussianDensity<TScalarType> g(0,1);
         return g.cdf(std::sqrt(lambda/x)*(x/mu-1)) +
@@ -201,6 +195,55 @@ public:
 
     TScalarType mode() const{
         return mu*(std::sqrt(1+9*mu*mu/(4*lambda*lambda)) - 3*mu/(2*lambda));
+    }
+
+    std::string ToString() const{
+        return std::string("InverseGaussianDensity");
+    }
+
+    static std::pair<TScalarType,TScalarType> GetMeanAndLambda(TScalarType mode, TScalarType variance){
+        // since one has to solve a non-linear equation to get the mean
+        // given the mode and variance, we perform Halley's method.
+        //
+        // Solve f(x) = 0
+        //
+        // xn+1 = xn - 2f(xn)f'(xn) / ( 2f'(xn)^2 - f(xn)*f''(xn) )
+        //
+        // as initial guess we use the value of the mode.
+
+
+        // f: how to get mode given mean and variance (minus m to set f equal to zero)
+        auto f = [](TScalarType mu, TScalarType m, TScalarType v)->TScalarType {
+            return mu*std::sqrt(9*v*v/(4*mu*mu*mu*mu) +1) -3*v/(2*mu) - m;
+        };
+
+        // df: first derivative of f with respect to mu
+        auto df = [](TScalarType mu, TScalarType m, TScalarType v)->TScalarType {
+            return std::sqrt(9*v*v/(4*mu*mu*mu*mu) +1) - 9*v*v/(mu*mu*std::sqrt(9*v*v+4*mu*mu*mu*mu)) + 3*v/(2*mu*mu);
+        };
+
+        // ddf: second derivative of f with respect to mu
+        auto ddf = [](TScalarType mu, TScalarType m, TScalarType v)->TScalarType {
+            return -(3*v*(std::pow(9*v*v+4*mu*mu*mu*mu,3.0/2) - 27*v*v*v - 36*mu*mu*mu*mu*v))/(mu*mu*mu*std::pow(9*v*v+4*mu*mu*mu*mu,3.0/2));
+        };
+
+        typedef std::function<TScalarType(TScalarType,TScalarType,TScalarType)> Function;
+        auto halley = [](TScalarType mu, TScalarType m, TScalarType v, Function f, Function df, Function ddf)->TScalarType {
+            return mu - (2*f(mu,m,v)*df(mu,m,v))/(2*std::pow(df(mu,m,v),2.0)-f(mu,m,v)*ddf(mu,m,v));
+        };
+
+        // Halley's method
+        TScalarType mu = mode*2; // initial value
+        TScalarType mu_old = mu;
+        for(unsigned i=0; i<100; i++){
+            mu = halley(mu,mode,variance, f, df , ddf);
+            if(std::abs(mu-mu_old)<1e-14){
+                break;
+            }
+            mu_old = mu;
+        }
+
+        return std::make_pair(mu, mu*mu*mu/variance);
     }
 
 private:
@@ -255,6 +298,17 @@ public:
 
     TScalarType mode() const{
         return (alpha-1)/beta;
+    }
+
+    std::string ToString() const{
+        return std::string("GammaDensity");
+    }
+
+    static TScalarType GetAlpha(TScalarType mode, TScalarType variance){
+        return (std::sqrt(mode*mode*(mode*mode+4*variance)) + mode*mode + 2*variance)/(2*variance);
+    }
+    static TScalarType GetBeta(TScalarType mode, TScalarType variance){
+        return std::sqrt(GammaDensity<TScalarType>::GetAlpha(mode,variance)/variance);
     }
 
 private:
