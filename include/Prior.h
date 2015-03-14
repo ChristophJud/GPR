@@ -55,7 +55,7 @@ public:
         TScalarType old_s = s;
 
         for(unsigned i=0; i<1000; i++){;
-            if(this->cdf(s)<y){
+            if(this->cdf(s)<=y){
                 step *= 2;
                 s += step;
             }
