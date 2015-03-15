@@ -29,6 +29,10 @@
 
 namespace gpr {
 
+template <typename T> int sgn(T val) {
+    return (T(0) < val) - (val < T(0));
+}
+
 // Superclass for density functions
 // all densities have to be evaluatable
 template<class TScalarType>
@@ -47,31 +51,39 @@ public:
     virtual TScalarType mode() const = 0;
 
     virtual std::string ToString() const = 0;
+   
+    // Bisection method to get the icdf
+    // cdf(u) - u = 0
+    // a has to be below cdf(u) and b has to be above cdf(u)
+    TScalarType icdf(TScalarType u, TScalarType a=-1e8, TScalarType b=1e8) const{
+        if(u<0 || u>1) throw std::string("Density::icdf: domain error. y is in [0,1]");
+	if(sgn(this->cdf(a)-u) == sgn(this->cdf(b)-u)) throw std::string("Density::icdf: domain error. cdf(a)-u must have opposite sign than cdf(b)-u.");
 
-    TScalarType icdf(TScalarType y) const{
-        if(y<0 || y>1) throw std::string("Density::icdf: domain error. y is in [0,1]");
-        TScalarType s = 0;
-        TScalarType step = 1;
-        TScalarType old_s = s;
+	for(unsigned i=0; i<1000; i++){
+	// Calculate c, the midpoint of the interval, c = 0.5 * (a + b)
+	TScalarType c = 0.5 * (a+b);
 
-        for(unsigned i=0; i<1000; i++){;
-            if(this->cdf(s)<=y){
-                step *= 2;
-                s += step;
-            }
-            else{
-                step /= 2;
-                s -= step;
-            }
-            if(std::abs(s-old_s)<1e-14){
-                break;
-            }
-            else{
-                old_s = s;
-            }
-        }
+	// Calculate the function value at the midpoint, f(c)
+	TScalarType f = this->cdf(c)-u;
 
-        return s;// reflect(s,this->cdf(s), 1.0, 0.0).second;
+	// If convergence is satisfactory (that is, a - c is sufficiently small, 
+	// or f(c) is sufficiently small), return c and stop iterating
+	if(std::abs(a-c)<1e-10){ // || std::abs(f)<1e-14){
+		return c;
+	}
+	
+	// Examine the sign of f(c) and replace either (a, f(a)) or (b, f(b)) with (c, f(c)) 
+	// so that there is a zero crossing within the new interval
+	if(sgn(this->cdf(a)-u) != sgn(f)){
+		b = c;
+	}
+	if(sgn(this->cdf(b)-u) != sgn(f)){
+		a = c;
+	}
+	}
+
+        throw std::string("Density::icdf: not converged after 1000 iterations.");
+	return 0;
     }
 
 protected:
@@ -103,7 +115,7 @@ public:
     }
     ~GaussianDensity(){}
     TScalarType operator()(TScalarType x) const{
-        return 1/(sigma*std::sqrt(2*M_PI)) * std::exp(-(x-mu)*(x-mu)/(2*sigma*sigma));
+        return 1.0/(sigma*std::sqrt(2*M_PI)) * std::exp(-(x-mu)*(x-mu)/(2*sigma*sigma));
     }
 
     TScalarType operator()() const{
@@ -115,7 +127,7 @@ public:
     }
 
     TScalarType cdf(TScalarType x) const{
-        return 0.5*(1+std::erf(x-mu)/(sigma*std::sqrt(2)));
+        return 0.5*(1+std::erf((x-mu)/(sigma*std::sqrt(2))));
     }
 
     TScalarType mean() const{
@@ -177,10 +189,11 @@ public:
     }
 
     TScalarType cdf(TScalarType x) const{
-        if(x<0) return 0;
+        if(x<=0) return 0;
         GaussianDensity<TScalarType> g(0,1);
+	//std::cout << std::sqrt(lambda/x)*(x/mu-1) << " | " << std::exp(2*lambda/mu) << " | " << g.cdf(-std::sqrt(lambda/x)*(x/mu+1)) << " | " << 2*lambda/mu << std::endl;
         return g.cdf(std::sqrt(lambda/x)*(x/mu-1)) +
-                std::exp(2*lambda/mu) *
+                std::min(std::exp(2*lambda/mu), std::numeric_limits<TScalarType>::max()) *
                 g.cdf(-std::sqrt(lambda/x)*(x/mu+1));
 
     }
