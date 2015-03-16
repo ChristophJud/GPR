@@ -11,7 +11,7 @@ Basic Gaussian process regression library. (Eigen3 required)
 * Derivative of the kernels
 * Likelihood functions: Gaussian Log Likelihood (incl. derivative wrt. kernel parameter)
 * Prior distributions: Gaussian, Inverse Gaussian, Gamma (incl. sampling, cdf and inverse cdf)
-* * Prior distributions can be built by providing their mode and variance
+ * Prior distributions can be built by providing their mode and variance
 
 
 
