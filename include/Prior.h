@@ -200,7 +200,17 @@ public:
         else{
             logx = std::log(x);
         }
-        std::abs(1.0/x)*std::sqrt(lambda/(2*M_PI*logx*logx*logx)) * std::exp(-lambda*(logx-mu)*(logx-mu)/(2*mu*mu*logx));
+
+        TScalarType root;
+        if(x==1){
+            root = std::numeric_limits<TScalarType>::max();
+        }
+        else{
+            std::complex<TScalarType> f(lambda/(2*M_PI*logx*logx*logx));
+            root = std::abs(std::sqrt(f));
+        }
+
+        return std::abs(1.0/x)*root * std::exp(-lambda*(logx-mu)*(logx-mu)/(2*mu*mu*logx));
     }
 
 
