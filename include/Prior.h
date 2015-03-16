@@ -168,13 +168,15 @@ public:
         uniform_dist = std::uniform_real_distribution<TScalarType>(0, 1);
     }
     ~InverseGaussianDensity(){}
+
+    // Probability of x given lambda and mu
     TScalarType operator()(TScalarType x) const{
         if(x<=0) throw std::string("InverseGaussianDensity: domain error. The inverse Gaussian density is not defined for x<=0.");
 
         return std::sqrt(lambda/(2*M_PI*x*x*x)) * std::exp(-lambda*(x-mu)*(x-mu)/(2*mu*mu*x));
     }
 
-
+    // Sample from probability density
     TScalarType operator()() const{
         double v = normal_dist(Density<TScalarType>::g);
         double y = v*v;
@@ -188,10 +190,24 @@ public:
         }
     }
 
+    // log probability of x given lambda and mu
+    TScalarType log(TScalarType x) const{
+        if(x<0) throw std::string("InverseGaussianDensity::log: domain error. The log of the InverseGaussian is only defined for positive x.");
+        TScalarType logx;
+        if(x<std::numeric_limits<TScalarType>::epsilon()){
+            logx = std::log(std::numeric_limits<TScalarType>::epsilon());
+        }
+        else{
+            logx = std::log(x);
+        }
+        std::abs(1.0/x)*std::sqrt(lambda/(2*M_PI*logx*logx*logx)) * std::exp(-lambda*(logx-mu)*(logx-mu)/(2*mu*mu*logx));
+    }
+
+
+    // Probability of cumulative distribution
     TScalarType cdf(TScalarType x) const{
         if(x<=0) return 0;
         GaussianDensity<TScalarType> g(0,1);
-	//std::cout << std::sqrt(lambda/x)*(x/mu-1) << " | " << std::exp(2*lambda/mu) << " | " << g.cdf(-std::sqrt(lambda/x)*(x/mu+1)) << " | " << 2*lambda/mu << std::endl;
         return g.cdf(std::sqrt(lambda/x)*(x/mu-1)) +
                 std::min(std::exp(2*lambda/mu), std::numeric_limits<TScalarType>::max()) *
                 g.cdf(-std::sqrt(lambda/x)*(x/mu+1));
