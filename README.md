@@ -4,10 +4,15 @@ Basic Gaussian process regression library. (Eigen3 required)
 
 ## Features
 * Multivariate Gaussian process regression
-* Kernels: Gaussian, Periodic and Sum
 * Calculation of the derivative at a point
 * Calculation of the uncertainty at a point
 * Save and Load the Gaussian process to/from files
+* Kernels: White, Gaussian, Periodic, RationalQuadratic, Sum and Product
+* Derivative of the kernels
+* Likelihood functions: Gaussian Log Likelihood (incl. derivative wrt. kernel parameter)
+* Prior distributions: Gaussian, Inverse Gaussian, Gamma (incl. sampling, cdf and inverse cdf)
+ * Prior distributions can be built by providing their mode and variance
+
 
 
 ## Getting Started
@@ -64,6 +69,9 @@ The tests can be seen as good examples to how to use the library.
 ## TODOs
 * Matrix valued kernels
 * Store/load into/from hdf5 files
+ 
+## Issues
+* Load/Save of product and sum kernel
 
 ## References
 A thorough introduction can be found in the open book of C.E. Rasmussen: Rasmussen, Carl Edward. [Gaussian processes for machine learning.](http://www.gaussianprocess.org/gpml/) (2006).
