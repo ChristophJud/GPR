@@ -192,7 +192,7 @@ public:
 
     // log probability of x given lambda and mu
     TScalarType log(TScalarType x) const{
-        if(x<0) throw std::string("InverseGaussianDensity::log: domain error. The log of the InverseGaussian is only defined for positive x.");
+        if(x<=1) throw std::string("InverseGaussianDensity::log: domain error. The log of the InverseGaussian is only defined for x>1.");
         TScalarType logx;
         if(x<std::numeric_limits<TScalarType>::epsilon()){
             logx = std::log(std::numeric_limits<TScalarType>::epsilon());
@@ -201,16 +201,23 @@ public:
             logx = std::log(x);
         }
 
-        TScalarType root;
+        TScalarType root_value;
         if(x==1){
-            root = std::numeric_limits<TScalarType>::max();
+            root_value = std::sqrt(std::numeric_limits<TScalarType>::max());
         }
         else{
             std::complex<TScalarType> f(lambda/(2*M_PI*logx*logx*logx));
-            root = std::abs(std::sqrt(f));
+            root_value = std::abs(std::sqrt(f));
         }
 
-        return std::abs(1.0/x)*root * std::exp(-lambda*(logx-mu)*(logx-mu)/(2*mu*mu*logx));
+        TScalarType exp_value = std::exp(-lambda*(logx-mu)*(logx-mu)/(2*mu*mu*logx));
+        if(exp_value==0) exp_value = std::numeric_limits<TScalarType>::epsilon();
+
+        //std::cout << x << ", " << std::abs(1.0/x) << ", " << root_value << ", " << exp_value << ", " << std::abs(1.0/x) * root_value * exp_value << std::endl;
+
+
+
+        return std::abs(1.0/x) * root_value * exp_value;
     }
 
 
@@ -316,7 +323,25 @@ public:
         std::complex<TScalarType> cx(x);
         std::complex<TScalarType> alphamin1(alpha-1);
 
-        return std::abs(std::pow(cx,alphamin1)) / factor * std::exp(-x/beta);
+        return std::pow(beta,alpha)/std::tgamma(alpha) * std::abs(std::pow(cx,alphamin1)) * std::exp(-x/beta);
+    }
+
+    TScalarType log(TScalarType x) const{
+        if(x<=0) throw std::string("GammaDensity::log: domain error. The log of Gamma is only defined for x>0.");
+        TScalarType logx;
+        if(x<std::numeric_limits<TScalarType>::epsilon()){
+            logx = std::log(std::numeric_limits<TScalarType>::epsilon());
+        }
+        else{
+            logx = std::log(x);
+        }
+
+        // compute log power
+        std::complex<TScalarType> cx(x);
+        std::complex<TScalarType> clogx(logx);
+        std::complex<TScalarType> alphamin1(alpha-1);
+
+        return std::pow(beta,alpha)/(std::abs(x)*std::tgamma(alpha)) * std::abs(std::pow(clogx,alphamin1)) * std::exp(-logx/beta);
     }
 
     TScalarType operator()() const{

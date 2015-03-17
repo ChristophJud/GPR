@@ -71,6 +71,64 @@ private:
 };
 
 template <class TScalarType>
+class GaussianLikelihood : public Likelihood<TScalarType>{
+public:
+
+    typedef Likelihood<TScalarType> Superclass;
+    typedef GaussianLikelihood Self;
+    typedef std::shared_ptr<Self> SelfPointer;
+    typedef typename Superclass::VectorType VectorType;
+    typedef typename Superclass::MatrixType MatrixType;
+    typedef typename Superclass::GaussianProcessTypePointer GaussianProcessTypePointer;
+
+    virtual inline VectorType operator()(const GaussianProcessTypePointer gp) const{
+        MatrixType Y; // label matrix
+        this->GetLabelMatrix(gp, Y);
+
+        MatrixType C; // core matrix inv(K + sigmaI)
+        TScalarType determinant; // determinant of K + sigma I
+        determinant = this->GetCoreMatrix(gp, C);
+
+        // data fit
+        VectorType df = -0.5 * (Y.adjoint() * C * Y);
+        for(unsigned i=0; i<df.rows(); i++){
+            df[i] = std::exp(df[i]);
+        }
+
+        // complexity penalty
+        if(determinant < -std::numeric_limits<double>::epsilon()){
+            std::stringstream ss;
+            ss << "GaussianLogLikelihood: determinant of K is smaller than zero: " << determinant;
+            throw ss.str();
+        }
+        TScalarType cp;
+
+        if(determinant <= 0){
+            cp = 1.0/std::sqrt(std::numeric_limits<double>::min());
+        }
+        else{
+            cp = 1.0/std::sqrt(determinant);
+        }
+
+
+        // constant term
+        TScalarType ct = 1.0/std::pow(2*M_PI,C.rows()/2.0);
+
+        return df.array() * cp * ct;
+    }
+
+
+    GaussianLikelihood() : Superclass(){  }
+    virtual ~GaussianLikelihood() {}
+
+    virtual std::string ToString() const{ return "GaussianLikelihood"; }
+
+private:
+    GaussianLikelihood(const Self&); //purposely not implemented
+    void operator=(const Self&); //purposely not implemented
+};
+
+template <class TScalarType>
 class GaussianLogLikelihood : public Likelihood<TScalarType>{
 public:
 

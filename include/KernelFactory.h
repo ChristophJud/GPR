@@ -80,6 +80,7 @@ public:
 
     // Loads/Builds a kernel out of a kernel string
     static KernelTypePointer GetKernel(std::string& kernel_string){
+        KernelFactory<TScalarType>::RegisterKernels();
 
         // get kernel name
         std::stringstream line_stream(kernel_string);
@@ -123,7 +124,6 @@ public:
             return k;
         }
 
-
         // get kernel parameters
         typename KernelType::ParameterVectorType kernel_parameters;
         do{
@@ -136,7 +136,6 @@ public:
                 break;
             }
         }while(true);
-
 
         if(kernel_type.compare("GaussianKernel")==0){
             typedef GaussianKernel<TScalarType>		KernelType;
