@@ -404,7 +404,7 @@ void GaussianProcess<TScalarType>::ComputeDerivativeKernelMatrix(typename Gaussi
                 M(i + p*n, j) = v[p];
                 M(j + p*n, i) = v[p];
 
-                if(i + p*n == j) M(i + p*n, j) += m_Sigma;
+                //if(i + p*n == j) M(i + p*n, j) += m_Sigma; // TODO: not sure if this is needed
             }
         }
     }

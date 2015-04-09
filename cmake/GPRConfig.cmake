@@ -7,7 +7,7 @@
 # Compute paths
 get_filename_component(GPR_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
 
-set(GPR_INCLUDE_DIRS "${GPR_CMAKE_DIR}/../include")
+set(GPR_INCLUDE_DIRS "${GPR_CMAKE_DIR}/../install/include")
 message(${GPR_INCLUDE_DIRS}) 
 set(GPR_LIBRARY_DIRS "${GPR_CMAKE_DIR}/../install/lib")
 set(GPR_LIBRARIES gplib)

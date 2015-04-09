@@ -726,7 +726,6 @@ template <class TScalarType>
 unsigned PeriodicKernel<TScalarType>::m_NumberOfParameters = 3;
 
 
-
 }
 
 #include "KernelFactory.h"

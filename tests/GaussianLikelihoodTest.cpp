@@ -196,7 +196,7 @@ void Test2(){
     double sigma = 20;
     double scale = 100;
     double lambda = 1e-3;
-    for(unsigned i=0; i<1000; i++){
+    for(unsigned i=0; i<5000; i++){
         // analytical
         try{
             GaussianKernelTypePointer gk(new GaussianKernelType(sigma, scale));
@@ -212,7 +212,6 @@ void Test2(){
             return;
         }
     }
-
 
     std::vector<double> prediction_y;
     std::vector<double> prediction_x;
@@ -232,7 +231,7 @@ void Test2(){
         std::cout << "[passed]" << std::endl;
     }
     else{
-        std::cout << "[failed]" << std::endl;
+        std::cout << "[failed] with an error of " << err/prediction_x.size() << std::endl;
     }
 }
 

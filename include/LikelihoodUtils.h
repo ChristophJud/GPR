@@ -16,7 +16,7 @@
  */
 
 #pragma once
-#include <utility> // std::pair
+#include <utility> // std::tuple
 
 #include <unsupported/Eigen/FFT>
 
@@ -31,6 +31,7 @@ namespace gpr{
 template<class TScalarType>
 std::tuple<TScalarType, TScalarType, TScalarType> // (period length, dominant amplitude, sinuns likeness)
 GetLocalPeriodLength(const typename GaussianProcess<TScalarType>::VectorType &vec, unsigned ommit=1){
+    if(vec.rows() < 4+ommit) throw std::string("GetLocalPeriodLength: longer signal required. Check if a column vector is provided!");
     unsigned interval_size = vec.rows();
 
     Eigen::FFT<float> fft;
@@ -55,6 +56,8 @@ GetLocalPeriodLength(const typename GaussianProcess<TScalarType>::VectorType &ve
         amp_integral += amp;
     }
 
+    //std::cout << "amp max: " << amp_max << ", amp integral: " << amp_integral << std::endl;
+
     // returns a tuple of
     // - number of indices per period
     // - the maximum amplitude
@@ -66,7 +69,7 @@ GetLocalPeriodLength(const typename GaussianProcess<TScalarType>::VectorType &ve
         sinus_likeness = std::numeric_limits<TScalarType>::max();
     }
     else{
-        sinus_likeness = amp_integral/(amp_integral-amp_max);
+        sinus_likeness = (amp_integral/(amp_integral-amp_max) - 1); // multiplied by 2 becaus only half of the spectrum is integrated
     }
     return std::make_tuple(period_length, amplitude, sinus_likeness);
 }

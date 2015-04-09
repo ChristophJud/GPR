@@ -98,7 +98,7 @@ public:
         // complexity penalty
         if(determinant < -std::numeric_limits<double>::epsilon()){
             std::stringstream ss;
-            ss << "GaussianLogLikelihood: determinant of K is smaller than zero: " << determinant;
+            ss << "GaussianLikelihood: determinant of K is smaller than zero: " << determinant;
             throw ss.str();
         }
         TScalarType cp;
@@ -109,7 +109,6 @@ public:
         else{
             cp = 1.0/std::sqrt(determinant);
         }
-
 
         // constant term
         TScalarType ct = 1.0/std::pow(2*M_PI,C.rows()/2.0);
