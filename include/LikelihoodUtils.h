@@ -56,7 +56,7 @@ GetLocalPeriodLength(const typename GaussianProcess<TScalarType>::VectorType &ve
         amp_integral += amp;
     }
 
-    //std::cout << "amp max: " << amp_max << ", amp integral: " << amp_integral << std::endl;
+    std::cout << "amp max: " << amp_max << ", amp integral: " << amp_integral << std::endl;
 
     // returns a tuple of
     // - number of indices per period

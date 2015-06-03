@@ -20,6 +20,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <mutex>
 
 #include <Eigen/Dense>
 
@@ -150,6 +151,8 @@ public:
 
     void ToString() const;
 
+    void Lock(){ gp_lock.lock(); }
+    void UnLock(){ gp_lock.unlock(); }
 
     // Comparison operator
     bool operator ==(const GaussianProcess<TScalarType> &b) const;
@@ -231,6 +234,8 @@ private:
 	unsigned m_OutputDimension;
     InversionMethod m_InvMethod; // is not saved/loaded
     bool m_EfficientStorage;
+
+    std::mutex gp_lock;
 
 	bool debug;
 

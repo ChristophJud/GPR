@@ -53,6 +53,7 @@ std::vector<TScalarType> GetSamples(const Density<TScalarType>* p, unsigned num_
             //num_samples++;
         }
     }
+
     return distributed_vector;
 }
 

@@ -633,7 +633,7 @@ public:
     virtual inline TScalarType operator()(const VectorType & x, const VectorType & y) const{
         TScalarType sum = 0;
         for(unsigned i=0; i<x.rows(); i++){
-            double f = std::sin(m_B*(x[i] - y[i]));
+            double f = std::sin(m_B*(x[i] - y[i])); // m_B = PI/period_length
             sum += f*f;
         }
 
