@@ -71,10 +71,9 @@ The tests can be seen as good examples to how to use the library.
 * Store/load into/from hdf5 files
  
 ## Issues
-* Load/Save of product and sum kernel
 
 ## References
 A thorough introduction can be found in the open book of C.E. Rasmussen: Rasmussen, Carl Edward. [Gaussian processes for machine learning.](http://www.gaussianprocess.org/gpml/) (2006).
 
 ## License
-GPR itself is licensed under the Apache 2.0 license. It depends, however, on other open source projects, which are distributed under different licenses. These are [Eigen](http://eigen.tuxfamily.org) and [Boost](http://www.boost.org).
+GPR itself is licensed under the Apache 2.0 license. It depends, however, on other open source projects, which are distributed under different licenses. These are [Eigen](http://eigen.tuxfamily.org), [LAPACK](http://www.netlib.org/lapack/) and [Boost](http://www.boost.org).

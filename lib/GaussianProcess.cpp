@@ -28,6 +28,7 @@ namespace fs = boost::filesystem;
 #include "GaussianProcess.h"
 #include "KernelFactory.h"
 #include "MatrixIO.h"
+#include "LAPACKUtils.h"
 
 namespace gpr{
 
@@ -448,7 +449,12 @@ typename GaussianProcess<TScalarType>::MatrixType GaussianProcess<TScalarType>::
     // Uses the LU decomposition with full pivoting for the inversion
     case FullPivotLU:{
         if(debug) std::cout << " (inversion method: FullPivotLU) " << std::flush;
-        core = K.inverse();
+        try{
+            core = lapack::lu_invert<TScalarType>(K);
+        }
+        catch(lapack::LAPACKException& e){
+            core = K.inverse();
+        }
     }
     break;
 
@@ -488,15 +494,20 @@ typename GaussianProcess<TScalarType>::MatrixType GaussianProcess<TScalarType>::
     // computes the eigenvalues/eigenvectors of selfadjoint matrices
     case SelfAdjointEigenSolver:{
         if(debug) std::cout << " (inversion method: SelfAdjointEigenSolver) " << std::flush;
-        Eigen::SelfAdjointEigenSolver<MatrixType> es;
-        es.compute(K);
-        VectorType eigenValues = es.eigenvalues().reverse();
-        MatrixType eigenVectors = es.eigenvectors().rowwise().reverse();
-        if((eigenValues.real().array() < 0).any() && debug){
-            std::cout << "GaussianProcess::InvertKernelMatrix: warning: there are negative eigenvalues.";
-            std::cout.flush();
+        try{
+            core = lapack::chol_invert<TScalarType>(K);
         }
-        core = eigenVectors * VectorType(1/eigenValues.array()).asDiagonal() * eigenVectors.transpose();
+        catch(lapack::LAPACKException& e){
+            Eigen::SelfAdjointEigenSolver<MatrixType> es;
+            es.compute(K);
+            VectorType eigenValues = es.eigenvalues().reverse();
+            MatrixType eigenVectors = es.eigenvectors().rowwise().reverse();
+            if((eigenValues.real().array() < 0).any() && debug){
+                std::cout << "GaussianProcess::InvertKernelMatrix: warning: there are negative eigenvalues.";
+                std::cout.flush();
+            }
+            core = eigenVectors * VectorType(1/eigenValues.array()).asDiagonal() * eigenVectors.transpose();
+        }
     }
     break;
     }

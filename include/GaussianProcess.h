@@ -72,18 +72,18 @@ public:
 	/*
 	 * Predict new data point
 	 */
-    VectorType Predict(const VectorType &x);
+    virtual VectorType Predict(const VectorType &x);
 
 	/*
 	 * Predict new point (return value) and its derivative input parameter D
 	 */
-    VectorType PredictDerivative(const VectorType &x, MatrixType &D);
+    virtual VectorType PredictDerivative(const VectorType &x, MatrixType &D);
 
 
     /*
      * Returns the scalar product between x and y in the RKHS of this GP
      */
-    TScalarType operator()(const VectorType & x, const VectorType & y);
+    virtual TScalarType operator()(const VectorType & x, const VectorType & y);
 
     /*
      * Returns the positive credible interval at point x
@@ -93,7 +93,7 @@ public:
 	/*
 	 * If sample data has changed perform learning step
 	 */
-    void Initialize();
+    virtual void Initialize();
 
 
     // Constructors
@@ -146,21 +146,21 @@ public:
     void SetEfficientStorage(bool s){ m_EfficientStorage = s; }
 
     // IO methods
-    void Save(std::string prefix);
-    void Load(std::string prefix);
+    virtual void Save(std::string prefix);
+    virtual void Load(std::string prefix);
 
-    void ToString() const;
+    virtual void ToString() const;
 
     void Lock(){ gp_lock.lock(); }
     void UnLock(){ gp_lock.unlock(); }
 
     // Comparison operator
-    bool operator ==(const GaussianProcess<TScalarType> &b) const;
-    bool operator !=(const GaussianProcess<TScalarType> &b) const{
+    virtual bool operator ==(const GaussianProcess<TScalarType> &b) const;
+    virtual bool operator !=(const GaussianProcess<TScalarType> &b) const{
         return ! operator ==(b);
     }
 
-private:
+protected:
 
 	/*
 	 * Computation of kernel matrix K_ij = k(x_i, x_j)
@@ -239,6 +239,7 @@ private:
 
 	bool debug;
 
+private:
 	GaussianProcess(const Self &); //purposely not implemented
 	void operator=(const Self &); //purposely not implemented
 

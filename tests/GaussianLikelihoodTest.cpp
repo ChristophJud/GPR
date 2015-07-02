@@ -148,7 +148,7 @@ void Test2(){
     /*
      * Test 2: perform maximum likelihood
      *      - try to infer a squared function
-     *      - maximum is searched by brute force
+     *      - maximum is searched by g
      */
     std::cout << "Test 2: maximum log gaussian likelihood (gradient descent)... " << std::flush;
 

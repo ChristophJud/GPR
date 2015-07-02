@@ -8,6 +8,7 @@ INSTALL(FILES
 	LikelihoodUtils.h
 	Prior.h
 	PriorUtils.h
+	LAPACKUtils.h
 DESTINATION
 	include
 PERMISSIONS
