@@ -34,6 +34,7 @@ class GaussianProcess
 {
 public:
 	typedef GaussianProcess Self;
+    typedef std::shared_ptr<Self> Pointer;
 	typedef Kernel<TScalarType> KernelType;
     typedef std::shared_ptr<KernelType> KernelTypePointer;
 
@@ -166,8 +167,10 @@ protected:
 	 * Computation of kernel matrix K_ij = k(x_i, x_j)
 	 * 	- it is symmetric therefore only half of the kernel evaluations
 	 * 	  has to be performed
+     *
+     * (The actual computation is performed in ComputeKernelMatrixInternal)
 	 */
-    void ComputeKernelMatrix(MatrixType &M) const;
+    virtual void ComputeKernelMatrix(MatrixType &M) const;
 
 
     /*
@@ -185,28 +188,37 @@ protected:
      * Computation of the core matrix inv(K + sigma I)
      * it returns the determinant of K + sigma I just in case if it is needed
      */
-     TScalarType ComputeCoreMatrix(MatrixType &C);
+     void ComputeCoreMatrix(MatrixType &C);
+
+     /*
+      * Same as ComputeCoreMatrix but returns determinant of the kernel matrix
+      */
+     TScalarType ComputeCoreMatrixWithDeterminant(MatrixType &C);
 
     /*
-     * Inversion of the kernel matrix.
+     * Inversion of the kernel matrix. TODO: should go into a base class
      */
-    MatrixType InvertKernelMatrix(const MatrixType &K, InversionMethod inv_method);
+    MatrixType InvertKernelMatrix(const MatrixType &K, InversionMethod inv_method) const;
 
 	/*
 	 * Bring the label vectors in a matrix form Y,
 	 * where the rows are the labels.
+     *
+     * (it is actually performed in ComputeLabelMatrixInternal)
 	 */
-    void ComputeLabelMatrix(MatrixType &Y) const;
+    virtual void ComputeLabelMatrix(MatrixType &Y) const;
 
 	/*
 	 * Lerning is performed.
 	 */
-    void ComputeRegressionVectors();
+    virtual void ComputeRegressionVectors();
 
 	/*
 	 * Computation of the kernel vector V_i = k(x, x_i)
+     *
+     * (calls ComputeKernelVectorInternal)
 	 */
-    void ComputeKernelVector(const VectorType &x, VectorType &Kx) const;
+    virtual void ComputeKernelVector(const VectorType &x, VectorType &Kx) const;
 
 	/*
 	 * Compute difference matrix X = [x-x_0, x-x_1, ... x-x_n]^T
@@ -239,7 +251,33 @@ protected:
 
 	bool debug;
 
+
+//TODO: all internal methods should go into a base class
+
+    /*
+     * Computation of kernel matrix K_ij = k(x_i, x_j)
+     *  - the matrix M will be resized to the required size (number of samples)
+     * 	- it is symmetric therefore only half of the kernel evaluations
+     * 	  has to be performed
+     *  - the kernel matrix is computed using the provided samples
+     */
+    void ComputeKernelMatrixInternal(MatrixType &M, const VectorListType& samples) const;
+
+
+    /*
+     * Bring the label vectors in a matrix form Y,
+     * where the rows are the labels.
+     */
+    void ComputeLabelMatrixInternal(MatrixType &Y, const VectorListType& labels) const;
+
+
+    /*
+     * Computation of the kernel vector V_i = k(x, x_i)
+     */
+    void ComputeKernelVectorInternal(const VectorType &x, VectorType &Kx, const VectorListType& samples) const;
+
 private:
+
 	GaussianProcess(const Self &); //purposely not implemented
 	void operator=(const Self &); //purposely not implemented
 

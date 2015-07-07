@@ -365,18 +365,26 @@ void GaussianProcess<TScalarType>::ComputeKernelMatrix(typename GaussianProcess<
         std::cout << "GaussianProcess::ComputeKernelMatrix: building kernel matrix... ";
         std::cout.flush();
     }
-    unsigned n = m_SampleVectors.size();
+
+    ComputeKernelMatrixInternal(M, m_SampleVectors);
+
+    if(debug) std::cout << "[done]" << std::endl;
+}
+
+template< class TScalarType >
+void GaussianProcess<TScalarType>::ComputeKernelMatrixInternal(typename GaussianProcess<TScalarType>::MatrixType &M,
+                                                               const typename GaussianProcess<TScalarType>::VectorListType& samples) const{
+    unsigned n = samples.size();
     M.resize(n,n);
 
 #pragma omp parallel for
     for(unsigned i=0; i<n; i++){
         for(unsigned j=i; j<n; j++){
-            TScalarType v = (*m_Kernel)(m_SampleVectors[i],m_SampleVectors[j]);
+            TScalarType v = (*m_Kernel)(samples[i],samples[j]);
             M(i,j) = v;
             M(j,i) = v;
         }
     }
-    if(debug) std::cout << "[done]" << std::endl;
 }
 
 template< class TScalarType >
@@ -415,7 +423,24 @@ void GaussianProcess<TScalarType>::ComputeDerivativeKernelMatrix(typename Gaussi
 }
 
 template< class TScalarType >
-TScalarType GaussianProcess<TScalarType>::ComputeCoreMatrix(typename GaussianProcess<TScalarType>::MatrixType &C){
+void GaussianProcess<TScalarType>::ComputeCoreMatrix(typename GaussianProcess<TScalarType>::MatrixType &C){
+    MatrixType K;
+    ComputeKernelMatrix(K);
+
+    // add noise variance to diagonal
+    for(unsigned i=0; i<K.rows(); i++){
+        K(i,i) += m_Sigma;
+    }
+
+    C = InvertKernelMatrix(K, m_InvMethod);
+
+    if(debug){
+        std::cout << "GaussianProcess::ComputeCoreMatrix: inversion error: " << (K*C - MatrixType::Identity(K.rows(),K.cols())).norm() << std::endl;
+    }
+}
+
+template< class TScalarType >
+TScalarType GaussianProcess<TScalarType>::ComputeCoreMatrixWithDeterminant(typename GaussianProcess<TScalarType>::MatrixType &C){
     MatrixType K;
     ComputeKernelMatrix(K);
 
@@ -435,7 +460,7 @@ TScalarType GaussianProcess<TScalarType>::ComputeCoreMatrix(typename GaussianPro
 
 template< class TScalarType >
 typename GaussianProcess<TScalarType>::MatrixType GaussianProcess<TScalarType>::InvertKernelMatrix(const typename GaussianProcess<TScalarType>::MatrixType &K,
-                                                      typename GaussianProcess<TScalarType>::InversionMethod inv_method = GaussianProcess<TScalarType>::FullPivotLU){
+                                                      typename GaussianProcess<TScalarType>::InversionMethod inv_method = GaussianProcess<TScalarType>::FullPivotLU) const{
     // compute core matrix
     if(debug){
         std::cout << "GaussianProcess::InvertKernelMatrix: inverting kernel matrix... ";
@@ -518,16 +543,22 @@ typename GaussianProcess<TScalarType>::MatrixType GaussianProcess<TScalarType>::
 
 template< class TScalarType >
 void GaussianProcess<TScalarType>::ComputeLabelMatrix(typename GaussianProcess<TScalarType>::MatrixType &Y) const{
-    unsigned n = m_LabelVectors.size();
+    ComputeLabelMatrixInternal(Y, m_LabelVectors);
+}
+
+template< class TScalarType >
+void GaussianProcess<TScalarType>::ComputeLabelMatrixInternal(typename GaussianProcess<TScalarType>::MatrixType &Y,
+                                                              const typename GaussianProcess<TScalarType>::VectorListType& labels) const{
+    unsigned n = labels.size();
     if(!(n > 0)){
-        throw std::string("GaussianProcess::ComputeRegressionVectors: no ouput labels defined during computation of the regression vectors.");
+        throw std::string("GaussianProcess::ComputeLabelMatrixInternal: no ouput labels defined.");
     }
-    unsigned d = m_LabelVectors[0].size();
+    unsigned d = labels[0].size();
     Y.resize(n,d);
 
 #pragma omp parallel for
     for(unsigned i=0; i<n; i++){
-        Y.block(i,0,1,d) = m_LabelVectors[i].adjoint();
+        Y.block(i,0,1,d) = labels[i].adjoint();
     }
 }
 
@@ -568,13 +599,20 @@ template< class TScalarType >
 void GaussianProcess<TScalarType>::ComputeKernelVector(const typename GaussianProcess<TScalarType>::VectorType &x,
                                                        typename GaussianProcess<TScalarType>::VectorType &Kx) const{
     if(!m_Initialized){
-        throw std::string("GaussianProcess::ComputeKernelVector: gaussian process is not initialized.");
+        throw std::string("GaussianProcess::ComputeKernelVectorInternal: gaussian process is not initialized.");
     }
-    Kx.resize(m_RegressionVectors.rows());
+    ComputeKernelVectorInternal(x, Kx, m_SampleVectors);
+}
+
+template< class TScalarType >
+void GaussianProcess<TScalarType>::ComputeKernelVectorInternal(const typename GaussianProcess<TScalarType>::VectorType &x,
+                                                               typename GaussianProcess<TScalarType>::VectorType &Kx,
+                                                               const typename GaussianProcess<TScalarType>::VectorListType& samples) const{
+    Kx.resize(samples.size());
 
 #pragma omp parallel for
     for(unsigned i=0; i<Kx.size(); i++){
-        Kx(i) = (*m_Kernel)(x, m_SampleVectors[i]);
+        Kx(i) = (*m_Kernel)(x, samples[i]);
     }
 }
 

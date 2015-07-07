@@ -101,7 +101,7 @@ void Test1(){
     double scale_max = 0;
     double likelihood_max = std::numeric_limits<double>::lowest();
 
-    for(double scale=1; scale<1000; scale+=10){
+    for(double scale=1; scale<1000; scale+=40){
         for(double sigma=1; sigma<100; sigma+=1){
             // analytical
             try{
@@ -140,7 +140,7 @@ void Test1(){
         std::cout << "[passed]" << std::endl;
     }
     else{
-        std::cout << "[failed]" << std::endl;
+        std::cout << "[failed] with an error of " << err/prediction_x.size() << std::endl;
     }
 }
 
@@ -196,7 +196,7 @@ void Test2(){
     double sigma = 20;
     double scale = 100;
     double lambda = 1e-3;
-    for(unsigned i=0; i<5000; i++){
+    for(unsigned i=0; i<3000; i++){
         // analytical
         try{
             GaussianKernelTypePointer gk(new GaussianKernelType(sigma, scale));
@@ -324,11 +324,11 @@ void Test3(){
         err += std::abs(prediction_y[i]-signal(1,i));
     }
 
-    if(err/prediction_x.size() < 1e-5){
+    if(err/prediction_x.size() < 1e-4){
         std::cout << "[passed]" << std::endl;
     }
     else{
-        std::cout << "[failed]" << std::endl;
+        std::cout << "[failed]. Prediction error: " << err/prediction_x.size() << std::endl;
     }
 }
 

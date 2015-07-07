@@ -58,7 +58,7 @@ protected:
     }
 
     TScalarType GetCoreMatrix(const GaussianProcessTypePointer gp, MatrixType& C) const{
-        return gp->ComputeCoreMatrix(C); // computes core and returns kernel matrix
+        return gp->ComputeCoreMatrixWithDeterminant(C); // computes core and returns kernel matrix
     }
 
     void GetDerivativeKernelMatrix(const GaussianProcessTypePointer gp, MatrixType& D) const{
