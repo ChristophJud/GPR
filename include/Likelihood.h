@@ -35,12 +35,13 @@ template <class TScalarType>
 class Likelihood{
 public:
     typedef Likelihood Self;
-    typedef std::shared_ptr<Self> SelfPointer;
+    typedef std::shared_ptr<Self> Pointer;
 
     typedef GaussianProcess<TScalarType> GaussianProcessType;
     typedef std::shared_ptr<GaussianProcessType> GaussianProcessTypePointer;
     typedef typename GaussianProcessType::VectorType VectorType;
     typedef typename GaussianProcessType::MatrixType MatrixType;
+    typedef typename GaussianProcessType::DiagMatrixType DiagMatrixType;
 
     virtual inline VectorType operator()(const GaussianProcessTypePointer gp) const{
         throw std::string("Likelihood: operator() is not implemented.");
@@ -53,16 +54,20 @@ public:
 
 protected:
     // methods using friendship to gaussian process class
-    void GetLabelMatrix(const GaussianProcessTypePointer gp, MatrixType& Y) const{
+    virtual void GetLabelMatrix(const GaussianProcessTypePointer gp, MatrixType& Y) const{
         gp->ComputeLabelMatrix(Y);
     }
 
-    TScalarType GetCoreMatrix(const GaussianProcessTypePointer gp, MatrixType& C) const{
+    virtual TScalarType GetCoreMatrix(const GaussianProcessTypePointer gp, MatrixType& C) const{
         return gp->ComputeCoreMatrixWithDeterminant(C); // computes core and returns kernel matrix
     }
 
-    void GetDerivativeKernelMatrix(const GaussianProcessTypePointer gp, MatrixType& D) const{
+    virtual void GetDerivativeKernelMatrix(const GaussianProcessTypePointer gp, MatrixType& D) const{
         return gp->ComputeDerivativeKernelMatrix(D); // computes derivative of kernel
+    }
+
+    virtual TScalarType GetSigma(const GaussianProcessTypePointer gp) const{
+        return gp->GetSigma();
     }
 
 private:
@@ -207,6 +212,5 @@ private:
     GaussianLogLikelihood(const Self&); //purposely not implemented
     void operator=(const Self&); //purposely not implemented
 };
-
 
 }

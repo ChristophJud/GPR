@@ -9,6 +9,7 @@ INSTALL(FILES
 	Prior.h
 	PriorUtils.h
 	LAPACKUtils.h
+	SparseGaussianProcess.h
 DESTINATION
 	include
 PERMISSIONS

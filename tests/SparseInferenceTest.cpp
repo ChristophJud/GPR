@@ -7,247 +7,17 @@
 
 #include <Eigen/Dense>
 
-#include "Kernel.h"
 #include "GaussianProcess.h"
+#include "SparseGaussianProcess.h"
 
+#include "Likelihood.h"
+#include "SparseLikelihood.h"
 
-typedef gpr::GaussianKernel<double>             GaussianKernelType;
-typedef std::shared_ptr<GaussianKernelType>     GaussianKernelTypePointer;
-
-template< class TScalarType >
-class SparseGaussianProcess : public gpr::GaussianProcess<TScalarType>{
-public:
-    typedef SparseGaussianProcess Self;
-    typedef std::shared_ptr<Self> Pointer;
-
-    typedef typename gpr::GaussianProcess<TScalarType>  Superclass;
-    typedef typename Superclass::VectorType         VectorType;
-    typedef typename Superclass::MatrixType         MatrixType;
-    typedef typename Superclass::VectorListType     VectorListType;
-    typedef typename Superclass::MatrixListType     MatrixListType;
-    typedef typename Superclass::KernelType         KernelType;
-    typedef typename Superclass::KernelTypePointer  KernelTypePointer;
-
-
-    // Constructors
-    SparseGaussianProcess(KernelTypePointer kernel) : Superclass(kernel),
-                                                        m_Jitter(0),
-                                                        m_Initialized(false){}
-
-    // Destructor
-    virtual ~SparseGaussianProcess(){}
-
-    /*
-     * Add a new inducing sample lable pair to the sparse Gaussian process
-     *  x is the input vector
-     *  y the corresponding label vector
-     */
-    void AddInducingSample(const VectorType& x, const VectorType& y){
-        if(m_InducingSampleVectors.size() == 0){ // first call of AddSample defines dimensionality of input space
-            this->m_InputDimension = x.size();
-        }
-        if(m_InducingLabelVectors.size() == 0){ // first call of AddSample defines dimensionality of output space
-            this->m_OutputDimension = y.size();
-        }
-
-        this->CheckInputDimension(x, "SparseGaussianProcess::AddInducingSample: ");
-        this->CheckOutputDimension(y, "SparseGaussianProcess::AddInducingSample: ");
-
-        m_InducingSampleVectors.push_back(x);
-        m_InducingLabelVectors.push_back(y);
-        m_Initialized = false;
-    }
-
-    VectorType Predict(const VectorType &x){
-        Initialize();
-        this->CheckInputDimension(x, "GaussianProcess::Predict: ");
-        VectorType Kx;
-        ComputeKernelVector(x, Kx);
-        return (Kx.adjoint() * m_RegressionVectors).adjoint();
-    }
-
-    TScalarType operator()(const VectorType & x, const VectorType & y){
-        Initialize();
-        this->CheckInputDimension(x, "SparseGaussianProcess::(): ");
-        this->CheckInputDimension(y, "SparseGaussianProcess::(): ");
-        VectorType Kx;
-        ComputeKernelVector(x, Kx);
-        VectorType Ky;
-        ComputeKernelVector(y, Ky);
-
-        return (*this->m_Kernel)(x, y) -
-                Kx.adjoint() * m_IndusingInvertedKernelMatrix * Ky +
-                Kx.adjoint() * m_RegressionMatrix * Ky;
-    }
-
-    unsigned GetNumberOfSamples() const{
-        return m_InducingSampleVectors.size();
-    }
-
-    TScalarType GetJitter() const{
-        return m_Jitter;
-    }
-
-    void SetJitter(TScalarType jitter){
-        m_Jitter = jitter;
-        m_Initialized = false;
-    }
-
-    virtual void Initialize(){
-        if(m_Initialized){
-            return;
-        }
-        if(!(m_InducingSampleVectors.size() > 0)){
-            throw std::string("SparseGaussianProcess::Initialize: no inducing samples defined during initialization");
-        }
-        if(!(m_InducingLabelVectors.size() > 0)){
-            throw std::string("SparseGaussianProcess::Initialize: no inducing labels defined during initialization");
-        }
-        if(!(this->m_SampleVectors.size() > 0)){
-            throw std::string("SparseGaussianProcess::Initialize: no dense samples defined during initialization");
-        }
-        if(!(this->m_LabelVectors.size() > 0)){
-            throw std::string("SparseGaussianProcess::Initialize: no dense labels defined during initialization");
-        }
-
-        PreComputeRegression();
-        m_Initialized = true;
-
-    }
-
-protected:
-    /*
-     * Computation of inducing kernel matrix K_ij = k(x_i, x_j)
-     * 	- it is symmetric therefore only half of the kernel evaluations
-     * 	  has to be performed
-     *
-     * (The actual computation is performed in ComputeKernelMatrixInternal)
-     */
-    virtual void ComputeKernelMatrix(MatrixType &M) const{
-        if(this->debug){
-            std::cout << "SparseGaussianProcess::ComputeKernelMatrix: building kernel matrix... ";
-            std::cout.flush();
-        }
-
-        Superclass::ComputeKernelMatrixInternal(M, m_InducingSampleVectors);
-
-        if(this->debug) std::cout << "[done]" << std::endl;
-    }
-
-    /*
-     * Bring the label vectors in a matrix form Y,
-     * where the rows are the labels.
-     *
-     * (it is actually performed in ComputeLabelMatrixInternal)
-     */
-    virtual void ComputeLabelMatrix(MatrixType &Y) const{
-        Superclass::ComputeLabelMatrixInternal(Y, m_InducingLabelVectors);
-    }
-
-    /*
-     * Computation of the kernel vector V_i = k(x, x_i)
-     *
-     * (calls ComputeKernelVectorInternal)
-     */
-    virtual void ComputeKernelVector(const VectorType &x, VectorType &Kx) const{
-        Superclass::ComputeKernelVectorInternal(x, Kx, m_InducingSampleVectors);
-    }
-
-    /*
-     * Computation of the kernel vector matrix Kmn = k(x_i, y_j)
-     * where x is in the inducing samples and y in the dense samples
-     *
-     *  - Kmn = [Kx1 Kx2 ... Kxm] in R^nxm
-     *
-     * (calls ComputeKernelVectorInternal)
-     */
-    virtual void ComputeKernelVectorMatrix(MatrixType &Kmn) const{
-
-        unsigned n = this->m_SampleVectors.size();
-        unsigned m = m_InducingSampleVectors.size();
-
-        if(!(m<=n)){
-            throw std::string("SparseGaussianProcess::ComputeKernelVectorMatrix: number of dense samples must be higher than the number of sparse samples");
-        }
-
-        Kmn.resize(n, m);
-
-#pragma omp parallel for
-        for(unsigned i=0; i<n; i++){
-            for(unsigned j=0; j<m; j++){
-                Kmn(i, j) = (*this->m_Kernel)(m_InducingSampleVectors[j], this->m_SampleVectors[i]);
-            }
-        }
-    }
-
-
-    /*
-     * Lerning is performed.
-     *
-     * Mean:
-     *  Kxm * inv(Kmm) * mu, mu = sigma^2 Kmm * Sigma * Kmn * Y
-     *
-     */
-    virtual void PreComputeRegression(){
-        // Computation of kernel matrix
-        if(this->debug){
-            std::cout << "SparseGaussianProcess::PreComputeRegression: calculating regression vectors and regression matrix... " << std::endl;
-        }
-
-        MatrixType K;
-        ComputeKernelMatrix(K);
-
-        // add jitter to diagonal
-        for(unsigned i=0; i<K.rows(); i++){
-            K(i,i) += m_Jitter;
-        }
-
-        // inverting inducing kernel matrix
-        m_IndusingInvertedKernelMatrix = this->InvertKernelMatrix(K, this->m_InvMethod);
-
-        // computing kernel vector matrix between inducing points and dense points
-        MatrixType Kmn;
-        ComputeKernelVectorMatrix(Kmn);
-
-        // Computing label matrix
-        // calculate label matrix
-        // TODO: if a mean support is implemented, the mean has to be subtracted from the labels!
-        MatrixType Y;
-        Superclass::ComputeLabelMatrix(Y);
-
-        // computation of Sigma matrix
-        TScalarType inverse_sigma2 = 1.0/(this->m_Sigma*this->m_Sigma);
-        MatrixType S = K + inverse_sigma2*Kmn.adjoint()*Kmn;
-        m_SigmaMatrix = this->InvertKernelMatrix(S, this->m_InvMethod);
-
-
-        // regression vectors for computing mean
-        m_RegressionVectors = m_IndusingInvertedKernelMatrix * (inverse_sigma2*K*m_SigmaMatrix*Kmn.adjoint()*Y);
-
-        // regression matrix for computing variance
-        m_RegressionMatrix = m_IndusingInvertedKernelMatrix * (K*m_SigmaMatrix*K) * m_IndusingInvertedKernelMatrix;
-
-    }
-
-    TScalarType m_Jitter; // noise on inducing kernel matrix
-    bool m_Initialized;
-
-    VectorListType m_InducingSampleVectors;  // Dimensionality: TInputDimension
-    VectorListType m_InducingLabelVectors;  // Dimensionality: TOutputDimension
-    MatrixType m_RegressionVectors;         // mu of m(x)
-    MatrixType m_SigmaMatrix;
-    MatrixType m_IndusingInvertedKernelMatrix;
-    MatrixType m_RegressionMatrix;
-
-private:
-    SparseGaussianProcess(const Self &); //purposely not implemented
-    void operator=(const Self &); //purposely not implemented
-};
 
 void Test1(){
 
     // setup sparse Gaussian process
-    typedef SparseGaussianProcess<double> SparseGaussianProcessType;
+    typedef gpr::SparseGaussianProcess<double> SparseGaussianProcessType;
     typedef gpr::GaussianProcess<double> GaussianProcessType;
     typedef SparseGaussianProcessType::VectorType VectorType;
     typedef SparseGaussianProcessType::MatrixType MatrixType;
@@ -256,7 +26,7 @@ void Test1(){
     // generate a cool ground truth function
     auto f = [](double x)->double { return (0.5*std::sin(x+10*x) + std::sin(4*x))*x*x; };
     double noise = 0.1;
-    double jitter = 0;
+    double jitter = 0.5;
 
     static boost::minstd_rand randgen(static_cast<unsigned>(time(0)));
     static boost::normal_distribution<> dist(0, noise);
@@ -264,8 +34,8 @@ void Test1(){
 
 
     // setup kernel
-    double sigma = 0.1;
-    double scale = 1;
+    double sigma = 0.23;
+    double scale = 10;
     GaussianKernelTypePointer gk(new GaussianKernelType(sigma, scale));
 
     // setup sparse gaussian process
@@ -304,7 +74,7 @@ void Test1(){
     }
 
     // small index set
-    unsigned m = 13;
+    unsigned m = 25;
     VectorType Xm = VectorType::Zero(m);
     for(unsigned i=0; i<m; i++){
         Xm[i] = start + i*(stop-start)/m;
@@ -323,6 +93,55 @@ void Test1(){
     gp->Initialize();
     gp_test->Initialize();
     //std::cout << std::endl;
+
+
+    // construct Gaussian log likelihood
+    if(false){
+        typedef gpr::GaussianLogLikelihood<double> GaussianLogLikelihoodType;
+        typedef std::shared_ptr<GaussianLogLikelihoodType> GaussianLogLikelihoodTypePointer;
+        GaussianLogLikelihoodTypePointer gl(new GaussianLogLikelihoodType());
+        std::cout << "Likelihood before optimization: " << (*gl)(gp) << std::endl;
+
+        double lambda = 1e-5;
+        for(unsigned i=0; i<20; i++){
+            // analytical
+            try{
+                GaussianKernelTypePointer gk(new GaussianKernelType(sigma, scale));
+                gp->SetKernel(gk);
+
+                //std::cout << "Likelihood " << (*gl)(gp) << ", sigma/scale " << sigma << "/" << scale << std::endl;
+
+                VectorType likelihood_update = gl->GetParameterDerivatives(gp);
+
+                sigma += lambda * likelihood_update[0];
+                scale += lambda * likelihood_update[1];
+            }
+            catch(std::string& s){
+                std::cout << "[failed] " << s << std::endl;
+                return;
+            }
+        }
+
+        std::cout << "Likelihood after optimization: " <<  (*gl)(gp) << std::endl;
+        std::cout << "New sigma/scale: " << sigma << "/" << scale << std::endl;
+    }
+
+    // construct Gaussian log likelihood
+    typedef gpr::SparseGaussianLogLikelihood<double> SparseGaussianLogLikelihoodType;
+    typedef typename SparseGaussianLogLikelihoodType::Pointer SparseGaussianLogLikelihoodTypePointer;
+    SparseGaussianLogLikelihoodTypePointer sgl(new SparseGaussianLogLikelihoodType());
+
+
+    std::cout << "print " << (*sgl)(sgp) << std::endl;
+
+    // todo: test efficient inversion / determinant
+
+//    double sigma = 0.1;
+//    double scale = 1;
+//    GaussianKernelTypePointer gk(new GaussianKernelType(sigma, scale));
+//    sgl->SetKernel(new GaussianKernelType(1, scale));
+
+    return;
 
     std::cout << "import numpy as np" << std::endl;
     std::cout << "import pylab as plt" << std::endl;

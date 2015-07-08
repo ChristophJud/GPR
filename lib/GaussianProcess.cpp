@@ -372,6 +372,14 @@ void GaussianProcess<TScalarType>::ComputeKernelMatrix(typename GaussianProcess<
 }
 
 template< class TScalarType >
+void GaussianProcess<TScalarType>::AddNoiseToKernelMatrix(typename GaussianProcess<TScalarType>::MatrixType &M) const{
+    // add noise variance to diagonal
+    for(unsigned i=0; i<M.rows(); i++){
+        M(i,i) += m_Sigma;
+    }
+}
+
+template< class TScalarType >
 void GaussianProcess<TScalarType>::ComputeKernelMatrixInternal(typename GaussianProcess<TScalarType>::MatrixType &M,
                                                                const typename GaussianProcess<TScalarType>::VectorListType& samples) const{
     unsigned n = samples.size();
@@ -385,6 +393,33 @@ void GaussianProcess<TScalarType>::ComputeKernelMatrixInternal(typename Gaussian
             M(j,i) = v;
         }
     }
+}
+
+
+template< class TScalarType >
+TScalarType GaussianProcess<TScalarType>::ComputeKernelMatrixTrace() const{
+    if(debug){
+        std::cout << "GaussianProcess::ComputeKernelMatrixTrace: sum up diagonal elements of kernel matrix... ";
+        std::cout.flush();
+    }
+
+    TScalarType trace = ComputeKernelMatrixTraceInternal(m_SampleVectors);
+
+    if(debug) std::cout << "[done]" << std::endl;
+
+    return trace * m_Sigma;
+}
+
+template< class TScalarType >
+TScalarType GaussianProcess<TScalarType>::ComputeKernelMatrixTraceInternal(const typename GaussianProcess<TScalarType>::VectorListType& samples) const{
+    unsigned n = samples.size();
+    TScalarType trace = 0;
+
+#pragma omp parallel for
+    for(unsigned i=0; i<n; i++){
+            trace += (*m_Kernel)(samples[i],samples[i]);
+    }
+    return trace;
 }
 
 template< class TScalarType >
@@ -423,14 +458,13 @@ void GaussianProcess<TScalarType>::ComputeDerivativeKernelMatrix(typename Gaussi
 }
 
 template< class TScalarType >
-void GaussianProcess<TScalarType>::ComputeCoreMatrix(typename GaussianProcess<TScalarType>::MatrixType &C){
+void GaussianProcess<TScalarType>::ComputeCoreMatrix(typename GaussianProcess<TScalarType>::MatrixType &C) const{
     MatrixType K;
     ComputeKernelMatrix(K);
 
     // add noise variance to diagonal
-    for(unsigned i=0; i<K.rows(); i++){
-        K(i,i) += m_Sigma;
-    }
+    AddNoiseToKernelMatrix(K);
+
 
     C = InvertKernelMatrix(K, m_InvMethod);
 
@@ -440,14 +474,12 @@ void GaussianProcess<TScalarType>::ComputeCoreMatrix(typename GaussianProcess<TS
 }
 
 template< class TScalarType >
-TScalarType GaussianProcess<TScalarType>::ComputeCoreMatrixWithDeterminant(typename GaussianProcess<TScalarType>::MatrixType &C){
+TScalarType GaussianProcess<TScalarType>::ComputeCoreMatrixWithDeterminant(typename GaussianProcess<TScalarType>::MatrixType &C) const{
     MatrixType K;
     ComputeKernelMatrix(K);
 
     // add noise variance to diagonal
-    for(unsigned i=0; i<K.rows(); i++){
-        K(i,i) += m_Sigma;
-    }
+    AddNoiseToKernelMatrix(K);
 
     C = InvertKernelMatrix(K, m_InvMethod);
 

@@ -111,7 +111,7 @@ public:
     virtual ~GaussianProcess() {}
 
     const KernelTypePointer GetKernel() { return m_Kernel; }
-    void SetKernel(KernelTypePointer k) {
+    virtual void SetKernel(KernelTypePointer k) {
         m_Kernel = k;
         m_Initialized = false;
     }
@@ -134,9 +134,10 @@ public:
         m_Initialized = false;
     }
 
-    unsigned GetNumberOfInputDimensions() const{ return m_InputDimension; }
+    virtual unsigned GetNumberOfInputDimensions() const{ return m_InputDimension; }
 
-    void SetInversionMethod(InversionMethod m){ m_InvMethod = m; }
+    virtual void SetInversionMethod(InversionMethod m){ m_InvMethod = m; }
+    virtual InversionMethod GetInversionMethod(){ return m_InvMethod; }
 
     // Since for the kernel matrix a lot of memory might be needed,
     // one can turn on the efficient storage mode, which stores only
@@ -172,6 +173,17 @@ protected:
 	 */
     virtual void ComputeKernelMatrix(MatrixType &M) const;
 
+    /*
+     * Adds m_Sigma to each K_ii
+     */
+    virtual void AddNoiseToKernelMatrix(MatrixType &M) const;
+
+
+    /*
+     * Returns the trace of the kernel matrix
+     */
+    virtual TScalarType ComputeKernelMatrixTrace() const;
+
 
     /*
      * Computation of the derivative kernel matrix D_i = delta K / delta params_i
@@ -182,23 +194,23 @@ protected:
      *                       D_m-1]
      *    for m = number of params and D_i in nxn, n = number of samples
      */
-    void ComputeDerivativeKernelMatrix(MatrixType &M) const;
+    virtual void ComputeDerivativeKernelMatrix(MatrixType &M) const;
 
     /*
      * Computation of the core matrix inv(K + sigma I)
      * it returns the determinant of K + sigma I just in case if it is needed
      */
-     void ComputeCoreMatrix(MatrixType &C);
+     void ComputeCoreMatrix(MatrixType &C) const;
 
      /*
       * Same as ComputeCoreMatrix but returns determinant of the kernel matrix
       */
-     TScalarType ComputeCoreMatrixWithDeterminant(MatrixType &C);
+     TScalarType ComputeCoreMatrixWithDeterminant(MatrixType &C) const;
 
     /*
      * Inversion of the kernel matrix. TODO: should go into a base class
      */
-    MatrixType InvertKernelMatrix(const MatrixType &K, InversionMethod inv_method) const;
+    virtual MatrixType InvertKernelMatrix(const MatrixType &K, InversionMethod inv_method) const;
 
 	/*
 	 * Bring the label vectors in a matrix form Y,
@@ -263,6 +275,11 @@ protected:
      */
     void ComputeKernelMatrixInternal(MatrixType &M, const VectorListType& samples) const;
 
+    /*
+     * Returns the trace of the kernel matrix
+     *  sum(k(x_i, x_i)
+     */
+    TScalarType ComputeKernelMatrixTraceInternal(const VectorListType& samples) const;
 
     /*
      * Bring the label vectors in a matrix form Y,
