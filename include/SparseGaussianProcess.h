@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <limits>
+
 #include "Kernel.h"
 #include "GaussianProcess.h"
 
@@ -129,6 +131,18 @@ public:
 
     }
 
+    // this method is public for using it in testing
+    virtual void ComputeDenseKernelMatrix(MatrixType &M) const{
+        if(this->debug){
+            std::cout << "SparseGaussianProcess::ComputeDenseKernelMatrix: building kernel matrix... ";
+            std::cout.flush();
+        }
+
+        Superclass::ComputeKernelMatrixInternal(M, this->m_SampleVectors);
+
+        if(this->debug) std::cout << "[done]" << std::endl;
+    }
+
 protected:
     /*
      * Computation of inducing kernel matrix K_ij = k(x_i, x_j)
@@ -224,12 +238,13 @@ protected:
         if(this->debug){
             std::cout << "SparseGaussianProcess::PreComputeRegression: calculating regression vectors and regression matrix... " << std::endl;
         }
+        bool stable = (m_Jitter<std::numeric_limits<TScalarType>::min())? true : false;
 
         MatrixType K;
         ComputeKernelMatrixWithJitter(K);
 
         // inverting inducing kernel matrix
-        m_IndusingInvertedKernelMatrix = this->InvertKernelMatrix(K, this->m_InvMethod);
+        m_IndusingInvertedKernelMatrix = this->InvertKernelMatrix(K, this->m_InvMethod, stable);
 
         // computing kernel vector matrix between inducing points and dense points
         MatrixType Kmn;
@@ -244,8 +259,7 @@ protected:
         // computation of Sigma matrix
         TScalarType inverse_sigma2 = 1.0/(this->m_Sigma*this->m_Sigma);
         MatrixType S = K + inverse_sigma2*Kmn.adjoint()*Kmn;
-        m_SigmaMatrix = this->InvertKernelMatrix(S, this->m_InvMethod);
-
+        m_SigmaMatrix = this->InvertKernelMatrix(S, this->m_InvMethod, stable);
 
         // regression vectors for computing mean
         m_RegressionVectors = m_IndusingInvertedKernelMatrix * (inverse_sigma2*K*m_SigmaMatrix*Kmn.adjoint()*Y);
@@ -269,10 +283,19 @@ protected:
      *  - Identity (noise) matrix I_sigma
      */
     virtual void ComputeCoreMatrices(MatrixType &K, MatrixType &K_inv, MatrixType &Kmn, DiagMatrixType &I_sigma){
+        bool stable = (m_Jitter<std::numeric_limits<TScalarType>::min())? true : false;
 
+        if(this->debug) std::cout << "SparseGaussianProcess::ComputeCoreMatrices: compute kernel matrix..." << std::flush;
         ComputeKernelMatrixWithJitter(K);
-        K_inv = this->InvertKernelMatrix(K, this->m_InvMethod);
+        if(this->debug) std::cout << " [done]" << std::endl;
+
+        if(this->debug) std::cout << "SparseGaussianProcess::ComputeCoreMatrices: invert kernel matrix..." << std::flush;
+        K_inv = this->InvertKernelMatrix(K, this->m_InvMethod, stable);
+        if(this->debug) std::cout << " [done]" << std::endl;
+
+        if(this->debug) std::cout << "SparseGaussianProcess::ComputeCoreMatrices: compute link kernel matrix..." << std::flush;
         ComputeKernelVectorMatrix(Kmn);
+        if(this->debug) std::cout << " [done]" << std::endl;
 
         if(this->GetSigma()<=0){
             throw std::string("SparseGaussianProcess::ComputeCoreMatrices: sigma must be positive.");
@@ -280,15 +303,20 @@ protected:
         if(Kmn.rows() == 0){
             throw std::string("SparseGaussianProcess::ComputeCoreMatrices: empty sample set.");
         }
+
+        if(this->debug) std::cout << "SparseGaussianProcess::ComputeCoreMatrices: compute additional noise..." << std::flush;
         I_sigma.resize(Kmn.rows());
         I_sigma.setIdentity();
         I_sigma = (I_sigma.diagonal().array() * this->GetSigma()).matrix().asDiagonal();
+        if(this->debug) std::cout << " [done]" << std::endl;
     }
 
     /*
      * Computation of core matrix: Kmn * inv(Kmm) * Knm
      */
     virtual void ComputeCoreMatrix(MatrixType &C, MatrixType &K_inv) const{
+        bool stable = (m_Jitter<std::numeric_limits<TScalarType>::min())? true : false;
+
         MatrixType K;
         ComputeKernelMatrixWithJitter(K);
 
@@ -297,7 +325,7 @@ protected:
 
         std::cout << "C " << Kmn.rows() << " x " << Kmn.cols() << std::endl;
 
-        K_inv = this->InvertKernelMatrix(K, this->m_InvMethod);
+        K_inv = this->InvertKernelMatrix(K, this->m_InvMethod, stable);
 
         ComputeCoreMatrix(C, K_inv, Kmn);
     }

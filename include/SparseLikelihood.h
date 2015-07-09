@@ -55,30 +55,33 @@ public:
     SparseLikelihood() { }
     virtual ~SparseLikelihood() {}
 
-protected:
-    // methods using friendship to gaussian process class
-    virtual void GetLabelMatrix(const SparseGaussianProcessTypePointer gp, MatrixType& Y) const{
-        gp->ComputeDenseLabelMatrix(Y); // get dense labels
-    }
-
-    virtual TScalarType GetKernelMatrixTrace(const SparseGaussianProcessTypePointer gp) const{
-        return gp->ComputeKernelMatrixTrace();
-    }
-
-    virtual void GetCoreMatrix(const SparseGaussianProcessTypePointer gp, MatrixType& C, MatrixType& K_inv, MatrixType &Kmn) const{
-        gp->ComputeCoreMatrix(C, K_inv, Kmn); // computes core
-    }
-
-    virtual void GetDerivativeKernelMatrix(const SparseGaussianProcessTypePointer gp, MatrixType& D) const{
-        return gp->ComputeDerivativeKernelMatrix(D); // computes derivative of kernel
-    }
-
+    // this method is public for the us in testing
     virtual void GetCoreMatrices(const SparseGaussianProcessTypePointer gp,
                                   MatrixType &K,
                                   MatrixType &K_inv,
                                   MatrixType &Kmn,
                                   DiagMatrixType &I_sigma) const{
         gp->ComputeCoreMatrices(K, K_inv, Kmn, I_sigma);
+    }
+
+    // this method is public for the us in testing
+    virtual void GetCoreMatrix(const SparseGaussianProcessTypePointer gp, MatrixType& C, MatrixType& K_inv, MatrixType &Kmn) const{
+        gp->ComputeCoreMatrix(C, K_inv, Kmn); // computes core
+    }
+
+    // this method is public for the us in testing
+    virtual TScalarType GetKernelMatrixTrace(const SparseGaussianProcessTypePointer gp) const{
+        return gp->ComputeKernelMatrixTrace();
+    }
+
+protected:
+    // methods using friendship to gaussian process class
+    virtual void GetLabelMatrix(const SparseGaussianProcessTypePointer gp, MatrixType& Y) const{
+        gp->ComputeDenseLabelMatrix(Y); // get dense labels
+    }
+
+    virtual void GetDerivativeKernelMatrix(const SparseGaussianProcessTypePointer gp, MatrixType& D) const{
+        return gp->ComputeDerivativeKernelMatrix(D); // computes derivative of kernel
     }
 
     virtual MatrixType GetInverseMatrix(const SparseGaussianProcessTypePointer gp, MatrixType &K) const{
@@ -119,7 +122,12 @@ public:
     // | A + XBX'| = |B|*|A|*|inv(B) + X' inv(A) X|
     virtual inline TScalarType EfficientDeterminant(const DiagMatrixType& A, const MatrixType& B, const MatrixType& B_inv, const MatrixType &X) const{
         DiagMatrixType A_inv = (1.0/A.diagonal().array()).matrix().asDiagonal();
-        return B.determinant() * A.diagonal().array().prod() * (B_inv + X.adjoint() * A_inv * X).determinant();
+
+        TScalarType det_B = B.determinant();
+        if(std::isinf(det_B)){
+            det_B = std::numeric_limits<TScalarType>::max();
+        }
+        return det_B * A.diagonal().array().prod() * (B_inv + X.adjoint() * A_inv * X).determinant();
     }
 
     virtual inline VectorType operator()(const SparseGaussianProcessTypePointer gp) const{
@@ -170,6 +178,12 @@ public:
         // constant term
         TScalarType ct = -C.rows()/2.0 * std::log(2*M_PI);
 
+//        std::cout << "Knn trace: " << Knn_trace << std::endl;
+//        std::cout << "C trace: " << C.trace() << std::endl;
+//        std::cout << "Data fit: " << df << std::endl;
+//        std::cout << "Complexity: " << cp << std::endl;
+//        std::cout << "Constant: " << ct << std::endl;
+//        std::cout << "Sample regularization: " << sr << std::endl;
 
         return df.array() + (cp + ct + sr);
     }

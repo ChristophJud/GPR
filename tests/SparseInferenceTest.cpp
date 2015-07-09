@@ -26,7 +26,7 @@ void Test1(){
     // generate a cool ground truth function
     auto f = [](double x)->double { return (0.5*std::sin(x+10*x) + std::sin(4*x))*x*x; };
     double noise = 0.1;
-    double jitter = 0.5;
+    double jitter = 0.01;
 
     static boost::minstd_rand randgen(static_cast<unsigned>(time(0)));
     static boost::normal_distribution<> dist(0, noise);
@@ -56,7 +56,7 @@ void Test1(){
 
 
     // large index set
-    unsigned n = 1000;
+    unsigned n = 100;
     double start = -2;
     double stop = 5;
     VectorType Xn = VectorType::Zero(n);
@@ -74,7 +74,7 @@ void Test1(){
     }
 
     // small index set
-    unsigned m = 25;
+    unsigned m = 20;
     VectorType Xm = VectorType::Zero(m);
     for(unsigned i=0; i<m; i++){
         Xm[i] = start + i*(stop-start)/m;
@@ -132,7 +132,7 @@ void Test1(){
     SparseGaussianLogLikelihoodTypePointer sgl(new SparseGaussianLogLikelihoodType());
 
 
-    std::cout << "print " << (*sgl)(sgp) << std::endl;
+    std::cout <<  "print " << (*sgl)(sgp) << std::endl;
 
     // todo: test efficient inversion / determinant
 
@@ -257,10 +257,227 @@ void Test1(){
 
 }
 
+
+// test the efficient inversion resp. determinant
+void Test2(){
+    std::cout << "Test 2.1 efficient inversion: ... " << std::flush;
+
+    // setup sparse Gaussian process
+    typedef gpr::SparseGaussianProcess<double> SparseGaussianProcessType;
+    typedef SparseGaussianProcessType::VectorType VectorType;
+    typedef SparseGaussianProcessType::MatrixType MatrixType;
+    typedef SparseGaussianProcessType::DiagMatrixType DiagMatrixType;
+
+
+    // generate a cool ground truth function
+    auto f = [](double x)->double { return (0.5*std::sin(x+10*x) + std::sin(4*x))*x*x; };
+    double noise = 0.1;
+    double jitter = 0.5;
+
+    static boost::minstd_rand randgen(static_cast<unsigned>(time(0)));
+    static boost::normal_distribution<> dist(0, noise);
+    static boost::variate_generator<boost::minstd_rand, boost::normal_distribution<> > r(randgen, dist);
+
+
+    // setup kernel
+    double sigma = 0.23;
+    double scale = 10;
+    GaussianKernelTypePointer gk(new GaussianKernelType(sigma, scale));
+
+    // setup sparse gaussian process
+    SparseGaussianProcessType::Pointer sgp(new SparseGaussianProcessType(gk));
+    //sgp->DebugOn();
+    sgp->SetSigma(noise);
+    sgp->SetJitter(jitter);
+
+
+    // large index set
+    unsigned n = 1000;
+    double start = -2;
+    double stop = 5;
+    VectorType Xn = VectorType::Zero(n);
+    for(unsigned i=0; i<n; i++){
+        Xn[i] = start + i*(stop-start)/n;
+    }
+    // fill up to sgp
+    std::vector<double> dense_y;
+    std::vector<double> sparse_y;
+    for(unsigned i=0; i<n; i++){
+        double v = f(Xn[i])+r();
+        dense_y.push_back(v);
+        sgp->AddSample(VectorType::Constant(1,Xn[i]), VectorType::Constant(1,v));
+    }
+
+    // small index set
+    unsigned m = 25;
+    VectorType Xm = VectorType::Zero(m);
+    for(unsigned i=0; i<m; i++){
+        Xm[i] = start + i*(stop-start)/m;
+    }
+    // fill up to sgp
+    for(unsigned i=0; i<m; i++){
+        double v = f(Xm[i])+r();
+        sparse_y.push_back(v);
+        sgp->AddInducingSample(VectorType::Constant(1,Xm[i]), VectorType::Constant(1,v));
+    }
+
+    //std::cout << "Initializing sparse GP..." << std::flush;
+    sgp->Initialize();
+
+
+    // construct Gaussian log likelihood
+    typedef gpr::SparseGaussianLogLikelihood<double> SparseGaussianLogLikelihoodType;
+    typedef typename SparseGaussianLogLikelihoodType::Pointer SparseGaussianLogLikelihoodTypePointer;
+    SparseGaussianLogLikelihoodTypePointer sgl(new SparseGaussianLogLikelihoodType());
+
+    // get all the important matrices
+    MatrixType K;
+    MatrixType K_inv;
+    MatrixType Kmn;
+    DiagMatrixType I_sigma;
+
+    sgl->GetCoreMatrices(sgp, K, K_inv, Kmn, I_sigma);
+
+    //---------------------------------------------------------------------------
+    // inversion test
+    MatrixType D;
+    sgl->EfficientInversion(sgp, D, I_sigma, K_inv, K, Kmn);
+
+    MatrixType T = (MatrixType(I_sigma)+Kmn*K_inv*Kmn.adjoint()).inverse();
+    double inv_error = (D-T).norm();
+
+    if(inv_error < 1e-8){
+        std::cout << "[passed]" << std::endl;
+    }
+    else{
+        std::cout << "[failed]" << std::endl;
+    }
+
+    std::cout << "Test 2.2 efficient determinant: ... " << std::flush;
+    //---------------------------------------------------------------------------
+    // determinant test
+    double determinant = sgl->EfficientDeterminant(I_sigma, K_inv, K, Kmn);
+    double det_err = std::fabs(determinant-(MatrixType(I_sigma)+Kmn*K_inv*Kmn.adjoint()).determinant());
+
+    if(det_err < 1e-10){
+        std::cout << "[passed]" << std::endl;
+    }
+    else{
+        std::cout << "[failed]" << std::endl;
+    }
+
+}
+
+void Test3(double jitter){
+    std::cout << "Test 3.1 core matrix test (jitter=" << jitter << "): ... " << std::flush;
+
+    // setup sparse Gaussian process
+    typedef gpr::SparseGaussianProcess<double> SparseGaussianProcessType;
+    typedef SparseGaussianProcessType::VectorType VectorType;
+    typedef SparseGaussianProcessType::MatrixType MatrixType;
+    typedef SparseGaussianProcessType::DiagMatrixType DiagMatrixType;
+
+    typedef gpr::GaussianProcess<double> GaussianProcessType;
+
+    // generate a cool ground truth function
+    auto f = [](double x)->double { return (0.5*std::sin(x+10*x) + std::sin(4*x))*x*x; };
+    double noise = 0.01;
+
+
+    // setup kernel
+    double sigma = 0.23;
+    double scale = 10;
+    GaussianKernelTypePointer gk(new GaussianKernelType(sigma, scale));
+
+    // setup sparse gaussian process
+    SparseGaussianProcessType::Pointer sgp(new SparseGaussianProcessType(gk));
+    //sgp->DebugOn();
+    sgp->SetSigma(noise);
+    sgp->SetJitter(jitter);
+
+
+    // large index set
+    unsigned n = 10;
+    double start = -2;
+    double stop = 5;
+    VectorType Xn = VectorType::Zero(n);
+    for(unsigned i=0; i<n; i++){
+        Xn[i] = start + i*(stop-start)/n;
+    }
+    // fill up to sgp
+    std::vector<double> dense_y;
+    std::vector<double> sparse_y;
+    for(unsigned i=0; i<n; i++){
+        double v = f(Xn[i]);
+        dense_y.push_back(v);
+        sgp->AddSample(VectorType::Constant(1,Xn[i]), VectorType::Constant(1,v));
+    }
+
+    // small index set
+    unsigned m = 10;
+    VectorType Xm = VectorType::Zero(m);
+    for(unsigned i=0; i<m; i++){
+        Xm[i] = start + i*(stop-start)/m;
+    }
+    // fill up to sgp
+    for(unsigned i=0; i<m; i++){
+        double v = f(Xm[i]);
+        sparse_y.push_back(v);
+        sgp->AddInducingSample(VectorType::Constant(1,Xm[i]), VectorType::Constant(1,v));
+    }
+
+    //std::cout << "Initializing sparse GP..." << std::flush;
+    sgp->Initialize();
+
+
+    // construct Gaussian log likelihood
+    typedef gpr::SparseGaussianLogLikelihood<double> SparseGaussianLogLikelihoodType;
+    typedef typename SparseGaussianLogLikelihoodType::Pointer SparseGaussianLogLikelihoodTypePointer;
+    SparseGaussianLogLikelihoodTypePointer sgl(new SparseGaussianLogLikelihoodType());
+
+    // get all the important matrices
+    MatrixType K;
+    MatrixType K_inv;
+    MatrixType Kmn;
+    DiagMatrixType I_sigma;
+
+    sgl->GetCoreMatrices(sgp, K, K_inv, Kmn, I_sigma);
+
+
+    //---------------------------------------------------------------------------
+    // core matrix test
+    MatrixType C; //
+    sgl->GetCoreMatrix(sgp, C, K_inv, Kmn);
+
+    MatrixType M;
+    sgp->ComputeDenseKernelMatrix(M);
+
+    double err = (C-M).norm();
+
+    if((err < 1e-2 && jitter > 0) || (err < 2000 && jitter == 0)){
+        std::cout << "[passed]" << std::endl;
+    }
+    else{
+        std::cout << "[failed] with an error of " << err << std::endl;
+    }
+
+
+    std::cout << "Test 3.2 core matrix trace test (jitter=" << jitter << "): ... " << std::flush;
+    if(M.trace() == sgl->GetKernelMatrixTrace(sgp)){
+        std::cout << "[passed]" << std::endl;
+    }
+    else{
+        std::cout << "[failed]" << std::endl;
+    }
+}
+
 int main (int argc, char *argv[]){
     //std::cout << "Sparse Gaussian Process test: " << std::endl;
     try{
         Test1();
+        //Test2();
+        //Test3(0); // jitter 0
+        //Test3(0.001); // jitter 0.001
     }
     catch(std::string& s){
         std::cout << "Error: " << s << std::endl;

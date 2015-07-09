@@ -407,7 +407,7 @@ TScalarType GaussianProcess<TScalarType>::ComputeKernelMatrixTrace() const{
 
     if(debug) std::cout << "[done]" << std::endl;
 
-    return trace * m_Sigma;
+    return trace;
 }
 
 template< class TScalarType >
@@ -415,7 +415,6 @@ TScalarType GaussianProcess<TScalarType>::ComputeKernelMatrixTraceInternal(const
     unsigned n = samples.size();
     TScalarType trace = 0;
 
-#pragma omp parallel for
     for(unsigned i=0; i<n; i++){
             trace += (*m_Kernel)(samples[i],samples[i]);
     }
@@ -492,7 +491,8 @@ TScalarType GaussianProcess<TScalarType>::ComputeCoreMatrixWithDeterminant(typen
 
 template< class TScalarType >
 typename GaussianProcess<TScalarType>::MatrixType GaussianProcess<TScalarType>::InvertKernelMatrix(const typename GaussianProcess<TScalarType>::MatrixType &K,
-                                                      typename GaussianProcess<TScalarType>::InversionMethod inv_method = GaussianProcess<TScalarType>::FullPivotLU) const{
+                                                      typename GaussianProcess<TScalarType>::InversionMethod inv_method = GaussianProcess<TScalarType>::FullPivotLU,
+                                                                                                   bool stable) const{
     // compute core matrix
     if(debug){
         std::cout << "GaussianProcess::InvertKernelMatrix: inverting kernel matrix... ";
@@ -507,7 +507,13 @@ typename GaussianProcess<TScalarType>::MatrixType GaussianProcess<TScalarType>::
     case FullPivotLU:{
         if(debug) std::cout << " (inversion method: FullPivotLU) " << std::flush;
         try{
-            core = lapack::lu_invert<TScalarType>(K);
+            if(stable){
+                core = K.inverse();
+            }
+            else{
+                if(debug) std::cout << " (using lapack) " << std::flush;
+                core = lapack::lu_invert<TScalarType>(K);
+            }
         }
         catch(lapack::LAPACKException& e){
             core = K.inverse();
