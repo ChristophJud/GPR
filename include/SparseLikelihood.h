@@ -52,7 +52,11 @@ public:
 
     virtual std::string ToString() const = 0;
 
-    SparseLikelihood() { }
+    virtual void DebugOn(){
+        debug = true;
+    }
+
+    SparseLikelihood(): debug(true) { }
     virtual ~SparseLikelihood() {}
 
     // this method is public for the us in testing
@@ -88,6 +92,7 @@ protected:
         return gp->InvertKernelMatrix(K, gp->GetInversionMethod());
     }
 
+    bool debug;
 private:
       SparseLikelihood (const Self&); //purposely not implemented
       void operator=(const Self&); //purposely not implemented
@@ -178,12 +183,14 @@ public:
         // constant term
         TScalarType ct = -C.rows()/2.0 * std::log(2*M_PI);
 
-//        std::cout << "Knn trace: " << Knn_trace << std::endl;
-//        std::cout << "C trace: " << C.trace() << std::endl;
-//        std::cout << "Data fit: " << df << std::endl;
-//        std::cout << "Complexity: " << cp << std::endl;
-//        std::cout << "Constant: " << ct << std::endl;
-//        std::cout << "Sample regularization: " << sr << std::endl;
+        if(this->debug){
+            std::cout << "Knn trace: " << Knn_trace << std::endl;
+            std::cout << "C trace: " << C.trace() << std::endl;
+            std::cout << "Data fit: " << df << std::endl;
+            std::cout << "Complexity: " << cp << std::endl;
+            std::cout << "Constant: " << ct << std::endl;
+            std::cout << "Sample regularization: " << sr << std::endl;
+        }
 
         return df.array() + (cp + ct + sr);
     }

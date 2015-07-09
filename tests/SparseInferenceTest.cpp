@@ -131,15 +131,9 @@ void Test1(){
     typedef typename SparseGaussianLogLikelihoodType::Pointer SparseGaussianLogLikelihoodTypePointer;
     SparseGaussianLogLikelihoodTypePointer sgl(new SparseGaussianLogLikelihoodType());
 
-
+    sgl->DebugOn();
     std::cout <<  "print " << (*sgl)(sgp) << std::endl;
 
-    // todo: test efficient inversion / determinant
-
-//    double sigma = 0.1;
-//    double scale = 1;
-//    GaussianKernelTypePointer gk(new GaussianKernelType(sigma, scale));
-//    sgl->SetKernel(new GaussianKernelType(1, scale));
 
     return;
 
