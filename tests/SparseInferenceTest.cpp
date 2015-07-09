@@ -96,7 +96,7 @@ void Test1(){
 
 
     // construct Gaussian log likelihood
-    if(false){
+    if(true){
         typedef gpr::GaussianLogLikelihood<double> GaussianLogLikelihoodType;
         typedef std::shared_ptr<GaussianLogLikelihoodType> GaussianLogLikelihoodTypePointer;
         GaussianLogLikelihoodTypePointer gl(new GaussianLogLikelihoodType());
@@ -109,7 +109,7 @@ void Test1(){
                 GaussianKernelTypePointer gk(new GaussianKernelType(sigma, scale));
                 gp->SetKernel(gk);
 
-                //std::cout << "Likelihood " << (*gl)(gp) << ", sigma/scale " << sigma << "/" << scale << std::endl;
+                std::cout << "Likelihood " << (*gl)(gp) << ", sigma/scale " << sigma << "/" << scale << std::endl;
 
                 VectorType likelihood_update = gl->GetParameterDerivatives(gp);
 
