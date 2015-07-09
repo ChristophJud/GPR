@@ -101,8 +101,8 @@ void Test1(){
     double scale_max = 0;
     double likelihood_max = std::numeric_limits<double>::lowest();
 
-    for(double scale=1; scale<1000; scale+=40){
-        for(double sigma=1; sigma<100; sigma+=1){
+    for(double scale=1; scale<1000; scale+=100){
+        for(double sigma=1; sigma<100; sigma+=2){
             // analytical
             try{
                 GaussianKernelTypePointer gk(new GaussianKernelType(sigma, scale));
@@ -161,7 +161,7 @@ void Test2(){
     auto f = [](double x)->double { return x*x; };
 
     double val = 0;
-    unsigned n = 100;
+    unsigned n = 101;
     MatrixType signal = MatrixType::Zero(2,n);
     for(unsigned i=0; i<n; i++){
         signal(0,i) = val;
@@ -172,15 +172,9 @@ void Test2(){
     // build Gaussian process and add the 1D samples
     WhiteKernelTypePointer pk(new WhiteKernelType(0)); // dummy kernel
     GaussianProcessTypePointer gp(new GaussianProcessType(pk));
-    gp->SetSigma(0.001); // zero since with the white kernel (see later) this is considered
+    gp->SetSigma(0.1); // zero since with the white kernel (see later) this is considered
 
-    for(unsigned i=0; i<10; i++){
-        VectorType x = VectorType::Zero(1); x[0] = signal(0,i);
-        VectorType y = VectorType::Zero(1); y[0] = signal(1,i);
-        gp->AddSample(x,y);
-    }
-
-    for(unsigned i=80; i<90; i++){
+    for(unsigned i=0; i<n; i+=10){
         VectorType x = VectorType::Zero(1); x[0] = signal(0,i);
         VectorType y = VectorType::Zero(1); y[0] = signal(1,i);
         gp->AddSample(x,y);
@@ -193,10 +187,10 @@ void Test2(){
     GaussianLogLikelihoodTypePointer gl(new GaussianLogLikelihoodType());
 
 
-    double sigma = 20;
-    double scale = 100;
-    double lambda = 1e-3;
-    for(unsigned i=0; i<3000; i++){
+    double sigma = 50;
+    double scale = 1300;
+    double lambda = 1;
+    for(unsigned i=0; i<100; i++){
         // analytical
         try{
             GaussianKernelTypePointer gk(new GaussianKernelType(sigma, scale));
@@ -204,8 +198,10 @@ void Test2(){
 
             VectorType likelihood_update = gl->GetParameterDerivatives(gp);
 
-            sigma -= lambda * likelihood_update[0];
-            scale -= lambda * likelihood_update[1];
+            //std::cout << (*gl)(gp) << ", sigma/scale: " << sigma << "/" << scale << std::endl;
+
+            sigma += lambda * likelihood_update[0];
+            scale += lambda * likelihood_update[1];
         }
         catch(std::string& s){
             std::cout << "[failed] " << s << std::endl;
@@ -216,10 +212,12 @@ void Test2(){
     std::vector<double> prediction_y;
     std::vector<double> prediction_x;
     // predict some stuff:
-    for(unsigned i=0; i<100; i++){
+    for(unsigned i=0; i<n; i++){
         VectorType x = VectorType::Zero(1); x[0] = signal(0,i);
         prediction_y.push_back(gp->Predict(x)[0]);
         prediction_x.push_back(signal(0,i));
+
+        //std::cout << prediction_y.back() << std::endl;
     }
 
     double err = 0;
@@ -288,7 +286,7 @@ void Test3(){
     double scale = 400;
     double likelihood_max = std::numeric_limits<double>::lowest();
     double period_max = 0;
-    for(double period=0; period<2*M_PI; period+=0.001){
+    for(double period=0; period<2*M_PI; period+=0.01){
         // analytical
         try{
             PeriodicKernelTypePointer gk(new PeriodicKernelType(scale, period, sigma));
