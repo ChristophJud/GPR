@@ -36,6 +36,10 @@ void Test1(){
     // setup kernel
     double sigma = 0.23;
     double scale = 10;
+
+    //double sigma = 1;
+    //double scale = 10;
+
     GaussianKernelTypePointer gk(new GaussianKernelType(sigma, scale));
 
     // setup sparse gaussian process
@@ -96,7 +100,7 @@ void Test1(){
 
 
     // construct Gaussian log likelihood
-    if(true){
+    if(false){
         typedef gpr::GaussianLogLikelihood<double> GaussianLogLikelihoodType;
         typedef std::shared_ptr<GaussianLogLikelihoodType> GaussianLogLikelihoodTypePointer;
         GaussianLogLikelihoodTypePointer gl(new GaussianLogLikelihoodType());

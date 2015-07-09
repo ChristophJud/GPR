@@ -56,7 +56,7 @@ public:
         debug = true;
     }
 
-    SparseLikelihood(): debug(true) { }
+    SparseLikelihood(): debug(false) { }
     virtual ~SparseLikelihood() {}
 
     // this method is public for the us in testing
