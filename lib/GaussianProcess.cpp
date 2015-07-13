@@ -428,18 +428,26 @@ void GaussianProcess<TScalarType>::ComputeDerivativeKernelMatrix(typename Gaussi
         std::cout.flush();
     }
 
+    ComputeDerivativeKernelMatrixInternal(M, m_SampleVectors);
+
+    if(debug) std::cout << "[done]" << std::endl;
+}
+
+template< class TScalarType >
+void GaussianProcess<TScalarType>::ComputeDerivativeKernelMatrixInternal(typename GaussianProcess<TScalarType>::MatrixType &M,
+                                                                         const typename GaussianProcess<TScalarType>::VectorListType& samples) const{
     unsigned num_params = m_Kernel->GetNumberOfParameters();
 
-    unsigned n = m_SampleVectors.size();
+    unsigned n = samples.size();
     M.resize(n*num_params,n);
 
 #pragma omp parallel for
     for(unsigned i=0; i<n; i++){
         for(unsigned j=i; j<n; j++){
             typename GaussianProcess<TScalarType>::VectorType v;
-            v = m_Kernel->GetDerivative(m_SampleVectors[i], m_SampleVectors[j]);
+            v = m_Kernel->GetDerivative(samples[i], samples[j]);
 
-            if(v.rows() != num_params) throw std::string("GaussianProcess::ComputeDerivativeKernelMatrix: dimension missmatch in derivative.");
+            if(v.rows() != num_params) throw std::string("GaussianProcess::ComputeDerivativeKernelMatrixInternal: dimension missmatch in derivative.");
             for(unsigned p=0; p<num_params; p++){
 
                 //if(i+p*n >= M.rows() || j+p*n >= M.rows())  throw std::string("GaussianProcess::ComputeDerivativeKernelMatrix: dimension missmatch in derivative.");
@@ -451,9 +459,6 @@ void GaussianProcess<TScalarType>::ComputeDerivativeKernelMatrix(typename Gaussi
             }
         }
     }
-    //std::cout << "M: " << std::endl;
-    //std::cout << M << std::endl;
-    if(debug) std::cout << "[done]" << std::endl;
 }
 
 template< class TScalarType >

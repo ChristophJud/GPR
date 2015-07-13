@@ -122,8 +122,17 @@ public:
         return normal_dist(Density<TScalarType>::g);
     }
 
+    TScalarType log(TScalarType x) const{
+        TScalarType normalization = std::log(1.0/(sigma*std::sqrt(2*M_PI)));
+        return normalization - (x-mu)*(x-mu)/(2*sigma*sigma);
+    }
+
     TScalarType GetDerivative(TScalarType x) const{
         return -(x-mu) * std::exp(-(x-mu)*(x-mu)/(2*sigma*sigma)) / (std::sqrt(2)*std::sqrt(M_PI)*sigma*sigma*sigma);
+    }
+
+    TScalarType GetLogDerivative(TScalarType x) const{
+        return -(x-mu)/(sigma*sigma);
     }
 
     TScalarType cdf(TScalarType x) const{

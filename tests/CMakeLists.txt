@@ -12,6 +12,7 @@ SET(kd_lib_src KernelDerivativeTest.cpp )
 SET(gl_lib_src GaussianLikelihoodTest.cpp)
 SET(lp_lib_src LAPACKTest.cpp)
 SET(si_lib_src SparseInferenceTest.cpp)
+SET(mp_lib_src MaximumAPosterioriTest.cpp)
 
 
 ADD_EXECUTABLE(gpTest ${gp_lib_src})
@@ -28,6 +29,7 @@ ADD_EXECUTABLE(kdTest ${kd_lib_src})
 ADD_EXECUTABLE(glTest ${gl_lib_src})
 ADD_EXECUTABLE(lpTest ${lp_lib_src})
 ADD_EXECUTABLE(siTest ${si_lib_src})
+ADD_EXECUTABLE(mpTest ${mp_lib_src})
 
 TARGET_LINK_LIBRARIES( gpTest gplib)
 TARGET_LINK_LIBRARIES( ioTest gplib)
@@ -43,6 +45,7 @@ TARGET_LINK_LIBRARIES( kdTest gplib)
 TARGET_LINK_LIBRARIES( glTest gplib)
 TARGET_LINK_LIBRARIES( lpTest gplib)
 TARGET_LINK_LIBRARIES( siTest gplib)
+TARGET_LINK_LIBRARIES( mpTest gplib)
 
 SET_TARGET_PROPERTIES(gpTest PROPERTIES OUTPUT_NAME gpTest)
 SET_TARGET_PROPERTIES(ioTest PROPERTIES OUTPUT_NAME ioTest)
@@ -58,6 +61,7 @@ SET_TARGET_PROPERTIES(kdTest PROPERTIES OUTPUT_NAME kdTest)
 SET_TARGET_PROPERTIES(glTest PROPERTIES OUTPUT_NAME glTest)
 SET_TARGET_PROPERTIES(lpTest PROPERTIES OUTPUT_NAME lpTest)
 SET_TARGET_PROPERTIES(siTest PROPERTIES OUTPUT_NAME siTest)
+SET_TARGET_PROPERTIES(mpTest PROPERTIES OUTPUT_NAME mpTest)
 
 INSTALL(TARGETS
 	gpTest
@@ -74,6 +78,7 @@ INSTALL(TARGETS
 	glTest
 	lpTest
 	siTest
+	mpTest
 RUNTIME DESTINATION bin)
 
 INSTALL(FILES 

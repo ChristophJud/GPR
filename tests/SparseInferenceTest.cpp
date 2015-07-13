@@ -60,7 +60,8 @@ void Test1(){
 
 
     // large index set
-    unsigned n = 100;
+    //unsigned n = 100;
+    unsigned n = 10;
     double start = -2;
     double stop = 5;
     VectorType Xn = VectorType::Zero(n);
@@ -78,7 +79,8 @@ void Test1(){
     }
 
     // small index set
-    unsigned m = 20;
+    //unsigned m = 20;
+    unsigned m = 8;
     VectorType Xm = VectorType::Zero(m);
     for(unsigned i=0; i<m; i++){
         Xm[i] = start + i*(stop-start)/m;
@@ -138,6 +140,7 @@ void Test1(){
     sgl->DebugOn();
     std::cout <<  "print " << (*sgl)(sgp) << std::endl;
 
+    //std::cout << "print " << sgl->GetParameterDerivatives(sgp) << std::endl;
 
     return;
 

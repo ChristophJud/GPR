@@ -199,14 +199,14 @@ protected:
     }
 
     /*
-     * Computation of the kernel vector matrix Kmn = k(x_i, y_j)
+     * Computation of the cross-covariance matrix Kmn = k(x_i, y_j)
      * where x is in the inducing samples and y in the dense samples
      *
      *  - Kmn = [Kx1 Kx2 ... Kxm] in R^nxm
      *
      * (calls ComputeKernelVectorInternal)
      */
-    virtual void ComputeKernelVectorMatrix(MatrixType &Kmn) const{
+    virtual void ComputeKernelVectorMatrix(MatrixType &Knm) const{
 
         unsigned n = this->m_SampleVectors.size();
         unsigned m = m_InducingSampleVectors.size();
@@ -215,12 +215,43 @@ protected:
             throw std::string("SparseGaussianProcess::ComputeKernelVectorMatrix: number of dense samples must be higher than the number of sparse samples");
         }
 
-        Kmn.resize(n, m);
+        Knm.resize(n, m);
 
 #pragma omp parallel for
         for(unsigned i=0; i<n; i++){
             for(unsigned j=0; j<m; j++){
-                Kmn(i, j) = (*this->m_Kernel)(m_InducingSampleVectors[j], this->m_SampleVectors[i]);
+                Knm(i, j) = (*this->m_Kernel)(m_InducingSampleVectors[j], this->m_SampleVectors[i]);
+            }
+        }
+    }
+
+    virtual void ComputeDerivativeKernelVectorMatrix(MatrixType &M)const{
+        unsigned num_params = this->m_Kernel->GetNumberOfParameters();
+
+        unsigned n = this->m_SampleVectors.size();
+        unsigned m = m_InducingSampleVectors.size();
+
+        if(!(m<=n)){
+            throw std::string("SparseGaussianProcess::ComputeDerivativeKernelVectorMatrix: number of dense samples must be higher than the number of sparse samples");
+        }
+        M.resize(n*num_params,m);
+
+    #pragma omp parallel for
+        for(unsigned i=0; i<n; i++){
+            for(unsigned j=0; j<m; j++){
+                typename GaussianProcess<TScalarType>::VectorType v;
+                v = this->m_Kernel->GetDerivative(m_InducingSampleVectors[j], this->m_SampleVectors[i]);
+
+                if(v.rows() != num_params) throw std::string("GaussianProcess::ComputeDerivativeKernelMatrixInternal: dimension missmatch in derivative.");
+                for(unsigned p=0; p<num_params; p++){
+
+                    //if(i+p*n >= M.rows() || j+p*n >= M.rows())  throw std::string("GaussianProcess::ComputeDerivativeKernelMatrix: dimension missmatch in derivative.");
+
+                    M(i + p*n, j) = v[p];
+                    //M(j + p*n, i) = v[p];
+
+                    //if(i + p*n == j) M(i + p*n, j) += m_Sigma; // TODO: not sure if this is needed
+                }
             }
         }
     }
@@ -340,7 +371,7 @@ protected:
     }
 
     /*
-     * Computation of the derivative inducing kernel matrix D_i = delta (Kmn*inv(Kmm)*Knm) / delta params_i
+     * Computation of the derivative inducing kernel matrix D_i = delta Kmm / delta params_i
      * 	- returns a matrix: [D_0
      *                        .
      *                       D_i
@@ -349,7 +380,13 @@ protected:
      *    for l = number of params and D_i in mxm, m = number of inducing samples
      */
     virtual void ComputeDerivativeKernelMatrix(MatrixType &M) const{
-        throw std::string("not jet implemented");
+        if(this->debug){
+            std::cout << "SparseGaussianProcess::ComputeDerivativeKernelMatrix: building kernel matrix... ";
+            std::cout.flush();
+        }
+        Superclass::ComputeDerivativeKernelMatrixInternal(M, m_InducingSampleVectors);
+
+        if(this->debug) std::cout << "[done]" << std::endl;
     }
 
 

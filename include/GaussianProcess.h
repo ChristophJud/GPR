@@ -193,8 +193,15 @@ protected:
      *                        .
      *                       D_m-1]
      *    for m = number of params and D_i in nxn, n = number of samples
+     *
+     * (calls ComputeDerivativeKernelMatrixInternal)
      */
     virtual void ComputeDerivativeKernelMatrix(MatrixType &M) const;
+
+    /*
+     * Computation of the derivative kernel matrix
+     */
+    virtual void ComputeDerivativeKernelMatrixInternal(MatrixType &M, const VectorListType& samples) const;
 
     /*
      * Computation of the core matrix inv(K + sigma I)
