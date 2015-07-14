@@ -375,7 +375,7 @@ template< class TScalarType >
 void GaussianProcess<TScalarType>::AddNoiseToKernelMatrix(typename GaussianProcess<TScalarType>::MatrixType &M) const{
     // add noise variance to diagonal
     for(unsigned i=0; i<M.rows(); i++){
-        M(i,i) += m_Sigma;
+        M(i,i) += m_Sigma*m_Sigma;
     }
 }
 
@@ -422,6 +422,35 @@ TScalarType GaussianProcess<TScalarType>::ComputeKernelMatrixTraceInternal(const
 }
 
 template< class TScalarType >
+typename GaussianProcess<TScalarType>::VectorType
+GaussianProcess<TScalarType>::ComputeDerivativeKernelMatrixTrace() const{
+    if(debug){
+        std::cout << "GaussianProcess::ComputeDerivativeKernelMatrixTrace: sum up diagonal elements of derivative kernel matrix... ";
+        std::cout.flush();
+    }
+
+    typename GaussianProcess<TScalarType>::VectorType trace = ComputeDerivativeKernelMatrixTraceInternal(m_SampleVectors);
+
+    if(debug) std::cout << "[done]" << std::endl;
+
+    return trace;
+}
+
+template< class TScalarType >
+typename GaussianProcess<TScalarType>::VectorType
+GaussianProcess<TScalarType>::ComputeDerivativeKernelMatrixTraceInternal(const typename GaussianProcess<TScalarType>::VectorListType& samples) const{
+    typedef typename GaussianProcess<TScalarType>::VectorType VectorType;
+    unsigned num_params = m_Kernel->GetNumberOfParameters();
+    VectorType trace = VectorType::Zero(num_params);
+
+    unsigned n = samples.size();
+    for(unsigned i=0; i<n; i++){
+            trace += m_Kernel->GetDerivative(samples[i], samples[i]);
+    }
+    return trace;
+}
+
+template< class TScalarType >
 void GaussianProcess<TScalarType>::ComputeDerivativeKernelMatrix(typename GaussianProcess<TScalarType>::MatrixType &M) const{
     if(debug){
         std::cout << "GaussianProcess::ComputeDerivativeKernelMatrix: building kernel matrix... ";
@@ -454,8 +483,6 @@ void GaussianProcess<TScalarType>::ComputeDerivativeKernelMatrixInternal(typenam
 
                 M(i + p*n, j) = v[p];
                 M(j + p*n, i) = v[p];
-
-                //if(i + p*n == j) M(i + p*n, j) += m_Sigma; // TODO: not sure if this is needed
             }
         }
     }
@@ -613,7 +640,7 @@ void GaussianProcess<TScalarType>::ComputeRegressionVectors(){
         std::cout << "GaussianProcess::ComputeRegressionVectors: calculating regression vectors... " << std::endl;
     }
 
-    // compute the core matrix which is inv(K + sigma I)
+    // compute the core matrix which is inv(K + sigma2 I)
     // This is a separate function call because it is also used if the core matrix
     // is not stored due to the efficient storage setting
     ComputeCoreMatrix(m_CoreMatrix);
@@ -625,7 +652,7 @@ void GaussianProcess<TScalarType>::ComputeRegressionVectors(){
 
 
     // calculate regression vectors
-    m_RegressionVectors = m_CoreMatrix * Y ; // inv(K + sigma)*Y
+    m_RegressionVectors = m_CoreMatrix * Y ; // inv(K + sigma2)*Y
 
     // deleting core matrix if the storage has to be handled efficiently
     // - it is not used for regression

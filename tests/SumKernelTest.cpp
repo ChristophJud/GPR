@@ -84,7 +84,7 @@ void Test1(){
     SumKernelTypePointer        sk(new SumKernelType(pk, gk));
 
     GaussianProcessTypePointer gp(new GaussianProcessType(sk));
-    gp->SetSigma(0.001);
+    gp->SetSigma(noise);
 
     // add samples
     double training_step_size = (interval_training_end - interval_start) / number_of_samples;

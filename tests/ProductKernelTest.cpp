@@ -71,7 +71,7 @@ void Test1(){
 
     //--------------------------------------------------------------------------------
     // perform training
-    double noise = 0.01;
+    double noise = 0.04;
     static boost::minstd_rand randgen(static_cast<unsigned>(time(0)));
     static boost::normal_distribution<> dist(0, noise);
     static boost::variate_generator<boost::minstd_rand, boost::normal_distribution<> > r(randgen, dist);
@@ -109,8 +109,9 @@ void Test1(){
         y_predict[i] = gp->Predict(x)(0);
     }
 
-    double err = (y-y_predict).norm();
-    if(err>3){
+
+    double err = (y-y_predict).norm() / gt_size;
+    if(err>0.02){
         std::cout << " [failed]. Prediction error: " << err << std::endl;
     }
     else{
@@ -136,10 +137,12 @@ void Test1(){
 
 
 int main (int argc, char *argv[]){
-    std::cout << "Product kernel test: " << std::endl;
+
     try{
-    Test1<float>();
-    Test1<double>();
+        std::cout << "Product kernel test (float): " << std::endl;
+        Test1<float>();
+        std::cout << "Product kernel test (double): " << std::endl;
+        Test1<double>();
     }
     catch(std::string& s){
         std::cout << "Error: " << s << std::endl;

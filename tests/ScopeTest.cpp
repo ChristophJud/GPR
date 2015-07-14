@@ -62,7 +62,7 @@ GaussianProcessTypePointer BuildGaussianProcess(){
 
     //--------------------------------------------------------------------------------
     // perform training
-    double noise = 0.01;
+    double noise = std::sqrt(0.01);
     static boost::minstd_rand randgen(static_cast<unsigned>(time(0)));
     static boost::normal_distribution<> dist(0, noise);
     static boost::variate_generator<boost::minstd_rand, boost::normal_distribution<> > r(randgen, dist);
@@ -75,7 +75,7 @@ GaussianProcessTypePointer BuildGaussianProcess(){
     SumKernelTypePointer        sk(new SumKernelType(pk, gk));
 
     GaussianProcessTypePointer gp(new GaussianProcessType(sk));
-    gp->SetSigma(0.001);
+    gp->SetSigma(std::sqrt(0.001));
 
     // add samples
     double training_step_size = (interval_training_end - interval_start) / number_of_samples;

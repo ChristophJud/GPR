@@ -111,22 +111,26 @@ public:
     virtual ~GaussianProcess() {}
 
     const KernelTypePointer GetKernel() { return m_Kernel; }
-    virtual void SetKernel(KernelTypePointer k) {
+    void SetKernel(KernelTypePointer k) {
         m_Kernel = k;
         m_Initialized = false;
     }
 
     // Some get / set methods
-	void DebugOn(){
+    void DebugOn(){
 		debug = true;
 	}
 
-    unsigned GetNumberOfSamples() const{
+    virtual unsigned GetNumberOfSamples() const{
 		return m_SampleVectors.size();
 	}
 
     TScalarType GetSigma() const{
         return m_Sigma;
+    }
+
+    TScalarType GetSigmaSquared() const{
+        return m_Sigma*m_Sigma;
     }
 
     void SetSigma(TScalarType sigma){
@@ -174,7 +178,7 @@ protected:
     virtual void ComputeKernelMatrix(MatrixType &M) const;
 
     /*
-     * Adds m_Sigma to each K_ii
+     * Adds m_Sigma*m_Sigma to each K_ii
      */
     virtual void AddNoiseToKernelMatrix(MatrixType &M) const;
 
@@ -183,6 +187,11 @@ protected:
      * Returns the trace of the kernel matrix
      */
     virtual TScalarType ComputeKernelMatrixTrace() const;
+
+    /*
+     * Returns the trace of the derivative kernel matrix
+     */
+    virtual VectorType ComputeDerivativeKernelMatrixTrace() const;
 
 
     /*
@@ -204,8 +213,8 @@ protected:
     virtual void ComputeDerivativeKernelMatrixInternal(MatrixType &M, const VectorListType& samples) const;
 
     /*
-     * Computation of the core matrix inv(K + sigma I)
-     * it returns the determinant of K + sigma I just in case if it is needed
+     * Computation of the core matrix inv(K + sigma2 I)
+     * it returns the determinant of K + sigma2 I just in case if it is needed
      */
      void ComputeCoreMatrix(MatrixType &C) const;
 
@@ -287,6 +296,12 @@ protected:
      *  sum(k(x_i, x_i)
      */
     TScalarType ComputeKernelMatrixTraceInternal(const VectorListType& samples) const;
+
+    /*
+     * Returns the trace of the derivative kernel matrix
+     *  partial / partial theta sum(k(x_i, x_i))
+     */
+    VectorType ComputeDerivativeKernelMatrixTraceInternal(const VectorListType& samples) const;
 
     /*
      * Bring the label vectors in a matrix form Y,

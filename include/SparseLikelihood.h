@@ -78,6 +78,11 @@ public:
         return gp->ComputeKernelMatrixTrace();
     }
 
+    // this method is public for the us in testing
+    virtual VectorType GetDerivativeKernelMatrixTrace(const SparseGaussianProcessTypePointer gp) const{
+        return gp->ComputeDerivativeKernelMatrixTrace();
+    }
+
 protected:
     // methods using friendship to gaussian process class
     virtual void GetLabelMatrix(const SparseGaussianProcessTypePointer gp, MatrixType& Y) const{
@@ -153,9 +158,9 @@ public:
         this->GetLabelMatrix(gp, Y);
 
         // data fit term
-        MatrixType D;
-        EfficientInversion(gp, D, I_sigma, K_inv, K, Knm);
-        VectorType df = -0.5 * (Y.adjoint() * D * Y);
+        MatrixType C_inv;
+        EfficientInversion(gp, C_inv, I_sigma, K_inv, K, Knm);
+        VectorType df = -0.5 * (Y.adjoint() * C_inv * Y);
 
 
         // complexity penalty (parameter regularizer)
@@ -181,11 +186,11 @@ public:
 
         TScalarType Knn_trace = this->GetKernelMatrixTrace(gp);
 
-        TScalarType sr = -0.5/gp->GetSigma() * (Knn_trace - C.trace());
+        TScalarType sr = -0.5/gp->GetSigmaSquared() * (Knn_trace - C.trace());
 
 
         // constant term
-        TScalarType ct = -C.rows()/2.0 * std::log(2*M_PI);
+        TScalarType ct = -gp->GetNumberOfSamples()/2.0 * std::log(2*M_PI);
 
         if(this->debug){
             std::cout << "Knn trace: " << Knn_trace << std::endl;
@@ -200,7 +205,6 @@ public:
     }
 
     virtual inline VectorType GetParameterDerivatives(const SparseGaussianProcessTypePointer gp) const{
-        std::cout << "computing parameter derivatives ... " << std::endl;
 
         // get all the important matrices
         MatrixType K;
@@ -210,67 +214,60 @@ public:
 
         this->GetCoreMatrices(gp, K, K_inv, Knm, I_sigma);
 
-        std::cout << "inv(Kmm)" << std::endl;
-        std::cout << K_inv << std::endl;
-
-        std::cout << "Kmn" << std::endl;
-        std::cout << Knm << std::endl;
-
-
         MatrixType Y;
         this->GetLabelMatrix(gp, Y);
 
+        VectorType Knn_d_trace = this->GetDerivativeKernelMatrixTrace(gp);
+
+
+        //----------------------------------------------------
         // data fit term
-        std::cout << "data fit" << std::endl;
         MatrixType C_inv;
         EfficientInversion(gp, C_inv, I_sigma, K_inv, K, Knm); // inv(I_sigma + Knm inv(Kmm) Kmn)
 
         // compute: -0.5 Y' inv(C) grad(C) inv(C) Y
-
-        std::cout << "inducing kernel derivative matrix" << std::endl;
-        // D has the dimensions of num_params*C.rows x C.cols
         MatrixType Kmm_d;
         this->GetDerivativeKernelMatrix(gp, Kmm_d);
-
-        std::cout << "derivative kmm" << std::endl;
-        std::cout << Kmm_d << std::endl;
 
         MatrixType Knm_d;
         this->GetDerivativeKernelVectorMatrix(gp, Knm_d);
 
-        std::cout << "derivative kmn" << std::endl;
-        std::cout << Knm_d << std::endl;
+        unsigned num_params = gp->GetKernel()->GetNumberOfParameters();
+        unsigned n = gp->GetNumberOfSamples();
+        unsigned m = gp->GetNumberOfInducingSamples();
 
-        MatrixType A; // derivative of I_sigma + Knm inv(Kmm) Kmn
-        A = Knm_d*K_inv*Knm.adjoint() + Knm*K_inv*Kmm_d*K_inv*Knm.adjoint() + Knm * K_inv * Knm_d.adjoint();
+        MatrixType A; // grad(C)
+        A.resize(num_params*n, n);
+        for(unsigned p=0; p<num_params; p++){
+            A.block(p*n, 0, n, n) = Knm_d.block(p*n, 0, n, m) * K_inv * Knm.adjoint() -
+                                    Knm * K_inv * Kmm_d.block(p*m, 0, m, m) * K_inv * Knm.adjoint() +
+                                    Knm * K_inv * Knm_d.block(p*n, 0, n, m).adjoint();
+        }
 
-        std::cout << "first term" << std::endl;
-        std::cout << Knm_d*K_inv*Knm.adjoint() << std::endl;
+        VectorType dt =  VectorType::Zero(num_params);
+        for(unsigned p=0; p<num_params; p++){
+            VectorType dTheta_i = 0.5*Y.adjoint()*C_inv*A.block(p*n, 0, n, n)*C_inv*Y;
+            if(dTheta_i.rows() != 1) throw std::string("SparseLikelihood::GetParameterDerivatives: dimension missmatch in calculating derivative of data fit term");
+            dt[p] = dTheta_i[0];
+        }
 
-        std::cout << "second term" << std::endl;
-        std::cout << Knm*K_inv*Kmm_d*K_inv*Knm.adjoint() << std::endl;
+        //----------------------------------------------------
+        // complexity term
+        VectorType ct =  VectorType::Zero(num_params);
+        for(unsigned p=0; p<num_params; p++){
+            TScalarType dTheta_i = -0.5 * (C_inv * A.block(p*n, 0, n, n)).trace();
+            ct[p] = dTheta_i;
+        }
 
-        std::cout << "third term" << std::endl;
-        std::cout << Knm * K_inv * Knm_d.adjoint() << std::endl;
+        //----------------------------------------------------
+        // sample regularization term
+        VectorType sr =  VectorType::Zero(num_params);
+        for(unsigned p=0; p<num_params; p++){
+            TScalarType dTheta_i = -0.5/gp->GetSigmaSquared() * (Knn_d_trace[p] - A.block(p*n, 0, n, n).trace());
+            sr[p] = dTheta_i;
+        }
 
-
-        std::cout << "derivative A" << std::endl;
-        std::cout << A << std::endl;
-
-
-//        std::cout << "stuff" << std::endl;
-//        unsigned num_params = static_cast<unsigned>(D.rows()/D.cols());
-//        if(static_cast<double>(D.rows())/static_cast<double>(D.cols()) - num_params != 0){
-//            throw std::string("SparseGaussianLogLikelihood: wrong dimension of derivative kernel matrix.");
-//        }
-        VectorType delta = VectorType::Zero(1);
-
-
-//        for(unsigned p=0; p<num_params; p++){
-//            delta[p] = 0.5 * ((alpha*alpha.adjoint() - C) * D.block(p*D.cols(),0,D.cols(),D.cols())).trace();
-//        }
-
-        return delta;
+        return dt + ct + sr;
     }
 
     SparseGaussianLogLikelihood() : Superclass(){  }

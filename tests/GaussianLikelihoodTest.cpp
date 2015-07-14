@@ -76,7 +76,7 @@ void Test1(){
     // build Gaussian process and add the 1D samples
     WhiteKernelTypePointer pk(new WhiteKernelType(0)); // dummy kernel
     GaussianProcessTypePointer gp(new GaussianProcessType(pk));
-    gp->SetSigma(0.001); // zero since with the white kernel (see later) this is considered
+    gp->SetSigma(std::sqrt(0.001)); // zero since with the white kernel (see later) this is considered
 
     for(unsigned i=0; i<10; i++){
         VectorType x = VectorType::Zero(1); x[0] = signal(0,i);
@@ -172,7 +172,7 @@ void Test2(){
     // build Gaussian process and add the 1D samples
     WhiteKernelTypePointer pk(new WhiteKernelType(0)); // dummy kernel
     GaussianProcessTypePointer gp(new GaussianProcessType(pk));
-    gp->SetSigma(0.1); // zero since with the white kernel (see later) this is considered
+    gp->SetSigma(std::sqrt(0.1)); // zero since with the white kernel (see later) this is considered
 
     for(unsigned i=0; i<n; i+=10){
         VectorType x = VectorType::Zero(1); x[0] = signal(0,i);
@@ -260,7 +260,7 @@ void Test3(){
     // build Gaussian process and add the 1D samples
     WhiteKernelTypePointer pk(new WhiteKernelType(0)); // dummy kernel
     GaussianProcessTypePointer gp(new GaussianProcessType(pk));
-    gp->SetSigma(0.001); // zero since with the white kernel (see later) this is considered
+    gp->SetSigma(std::sqrt(0.001)); // zero since with the white kernel (see later) this is considered
 
     for(unsigned i=0; i<20; i++){
         VectorType x = VectorType::Zero(1); x[0] = signal(0,i);

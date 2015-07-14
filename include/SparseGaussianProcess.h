@@ -23,9 +23,6 @@
 #include "GaussianProcess.h"
 
 
-typedef gpr::GaussianKernel<double>             GaussianKernelType;
-typedef std::shared_ptr<GaussianKernelType>     GaussianKernelTypePointer;
-
 namespace gpr{
 template <class TScalarType> class SparseLikelihood;
 
@@ -74,6 +71,15 @@ public:
         m_Initialized = false;
     }
 
+    /*
+     * Removes all inducing sample lable pairs from the sparse Gaussian process
+     */
+    void ClearInducingSamples(){
+        m_InducingSampleVectors.clear();
+        m_InducingLabelVectors.clear();
+        m_Initialized = false;
+    }
+
     VectorType Predict(const VectorType &x){
         Initialize();
         this->CheckInputDimension(x, "GaussianProcess::Predict: ");
@@ -96,7 +102,7 @@ public:
                 Kx.adjoint() * m_RegressionMatrix * Ky;
     }
 
-    unsigned GetNumberOfSamples() const{
+    unsigned GetNumberOfInducingSamples() const{
         return m_InducingSampleVectors.size();
     }
 
@@ -220,7 +226,7 @@ protected:
 #pragma omp parallel for
         for(unsigned i=0; i<n; i++){
             for(unsigned j=0; j<m; j++){
-                Knm(i, j) = (*this->m_Kernel)(m_InducingSampleVectors[j], this->m_SampleVectors[i]);
+                Knm(i, j) = (*this->m_Kernel)(this->m_SampleVectors[i], m_InducingSampleVectors[j]);
             }
         }
     }
@@ -240,17 +246,15 @@ protected:
         for(unsigned i=0; i<n; i++){
             for(unsigned j=0; j<m; j++){
                 typename GaussianProcess<TScalarType>::VectorType v;
-                v = this->m_Kernel->GetDerivative(m_InducingSampleVectors[j], this->m_SampleVectors[i]);
+                v = this->m_Kernel->GetDerivative(this->m_SampleVectors[i], m_InducingSampleVectors[j]);
 
-                if(v.rows() != num_params) throw std::string("GaussianProcess::ComputeDerivativeKernelMatrixInternal: dimension missmatch in derivative.");
+                if(v.rows() != num_params) throw std::string("SparseGaussianProcess::ComputeDerivativeKernelMatrixInternal: dimension missmatch in derivative.");
                 for(unsigned p=0; p<num_params; p++){
 
                     //if(i+p*n >= M.rows() || j+p*n >= M.rows())  throw std::string("GaussianProcess::ComputeDerivativeKernelMatrix: dimension missmatch in derivative.");
 
                     M(i + p*n, j) = v[p];
                     //M(j + p*n, i) = v[p];
-
-                    //if(i + p*n == j) M(i + p*n, j) += m_Sigma; // TODO: not sure if this is needed
                 }
             }
         }
@@ -338,7 +342,7 @@ protected:
         if(this->debug) std::cout << "SparseGaussianProcess::ComputeCoreMatrices: compute additional noise..." << std::flush;
         I_sigma.resize(Kmn.rows());
         I_sigma.setIdentity();
-        I_sigma = (I_sigma.diagonal().array() * this->GetSigma()).matrix().asDiagonal();
+        I_sigma = (I_sigma.diagonal().array() * this->GetSigmaSquared()).matrix().asDiagonal();
         if(this->debug) std::cout << " [done]" << std::endl;
     }
 
@@ -351,14 +355,14 @@ protected:
         MatrixType K;
         ComputeKernelMatrixWithJitter(K);
 
-        MatrixType Kmn;
-        ComputeKernelVectorMatrix(Kmn);
+        MatrixType Knm;
+        ComputeKernelVectorMatrix(Knm);
 
-        std::cout << "C " << Kmn.rows() << " x " << Kmn.cols() << std::endl;
+        std::cout << "C " << Knm.rows() << " x " << Knm.cols() << std::endl;
 
         K_inv = this->InvertKernelMatrix(K, this->m_InvMethod, stable);
 
-        ComputeCoreMatrix(C, K_inv, Kmn);
+        ComputeCoreMatrix(C, K_inv, Knm);
     }
 
     // additional interfaces for ComputeCoreMatrix
@@ -366,8 +370,8 @@ protected:
         MatrixType K_inv;
         ComputeCoreMatrix(C, K_inv);
     }
-    virtual void ComputeCoreMatrix(MatrixType &C, const MatrixType& K_inv, const MatrixType& Kmn) const{
-        C = Kmn * K_inv * Kmn.adjoint();
+    virtual void ComputeCoreMatrix(MatrixType &C, const MatrixType& K_inv, const MatrixType& Knm) const{
+        C = Knm * K_inv * Knm.adjoint();
     }
 
     /*

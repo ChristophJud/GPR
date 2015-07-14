@@ -61,7 +61,7 @@ public:
     // returns the parameter vector
     virtual inline const ParameterVectorType GetParameters(){
         return m_parameters;
-	}
+    }
 
     std::string ParametersToString(const ParameterVectorType& params) const{
         std::stringstream ss;
