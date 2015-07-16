@@ -203,6 +203,69 @@ public:
         return delta;
     }
 
+    virtual inline std::pair<VectorType,VectorType> GetValueAndParameterDerivatives(const GaussianProcessTypePointer gp) const{
+        MatrixType Y; // label matrix
+        this->GetLabelMatrix(gp, Y);
+
+        MatrixType C; // core matrix inv(K + sigmaI)
+        TScalarType determinant; // determinant of K + sigma I
+        determinant = this->GetCoreMatrix(gp, C);
+
+        // data fit
+        VectorType df = -0.5 * (Y.adjoint() * C * Y);
+
+        // complexity penalty
+//        if(determinant < -std::numeric_limits<double>::epsilon()){
+//            std::stringstream ss;
+//            ss << "GaussianLogLikelihood: determinant of K is smaller than zero: " << determinant;
+//            throw ss.str();
+//        }
+        TScalarType cp;
+
+        if(determinant <= std::numeric_limits<double>::min()){
+            cp = -0.5 * std::log(std::numeric_limits<double>::min());
+        }
+        else if(determinant > std::numeric_limits<double>::max()){
+            cp = -0.5 * std::log(std::numeric_limits<double>::max());
+        }
+        else{
+            cp = -0.5 * std::log(determinant);
+        }
+
+
+        // constant term
+        TScalarType ct = -C.rows()/2.0 * std::log(2*M_PI);
+
+        VectorType value = df.array() + (cp + ct);
+
+        if(std::isinf(value.array().sum())){
+            std::cout << "df: " << df << ", cp: " << cp << ", ct: " << ct << ", determinant: " << determinant << std::endl;
+            throw std::string("GaussianLogLikelihood::GetValueAndParameterDerivatives: likelihood is infinite.");
+        }
+
+
+        // DERIVATIVE
+
+        MatrixType alpha = C*Y;
+
+        // D has the dimensions of num_params*C.rows x C.cols
+        MatrixType D;
+        this->GetDerivativeKernelMatrix(gp, D);
+
+        unsigned num_params = static_cast<unsigned>(D.rows()/D.cols());
+        if(static_cast<double>(D.rows())/static_cast<double>(D.cols()) - num_params != 0){
+            throw std::string("GaussianLogLikelihood: wrong dimension of derivative kernel matrix.");
+        }
+        VectorType delta = VectorType::Zero(num_params);
+
+
+        for(unsigned p=0; p<num_params; p++){
+            delta[p] = 0.5 * ((alpha*alpha.adjoint() - C) * D.block(p*D.cols(),0,D.cols(),D.cols())).trace();
+        }
+
+        return std::make_pair(value, delta);
+    }
+
     GaussianLogLikelihood() : Superclass(){  }
     virtual ~GaussianLogLikelihood() {}
 

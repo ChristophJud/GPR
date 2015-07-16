@@ -15,6 +15,29 @@
 #include "Likelihood.h"
 #include "SparseLikelihood.h"
 
+/**
+ * An SVD based implementation of the Moore-Penrose pseudo-inverse
+ */
+template<class TMatrixType>
+TMatrixType pinv(const TMatrixType& m, double epsilon = std::numeric_limits<double>::epsilon()) {
+    typedef Eigen::JacobiSVD<TMatrixType> SVD;
+    SVD svd(m, Eigen::ComputeFullU | Eigen::ComputeFullV);
+    typedef typename SVD::SingularValuesType SingularValuesType;
+    const SingularValuesType singVals = svd.singularValues();
+    SingularValuesType invSingVals = singVals;
+    for(int i=0; i<singVals.rows(); i++) {
+        if(singVals(i) <= epsilon) {
+            invSingVals(i) = 0.0; // FIXED can not be safely inverted
+        }
+        else {
+            invSingVals(i) = 1.0 / invSingVals(i);
+        }
+    }
+    return TMatrixType(svd.matrixV() *
+            invSingVals.asDiagonal() *
+            svd.matrixU().transpose());
+}
+
 template<class TScalarType>
 class SparseGaussianProcessInference{
 public:
@@ -25,6 +48,7 @@ public:
     typedef typename SparseGaussianProcessType::Pointer         SparseGaussianProcessTypePointer;
     typedef typename SparseGaussianProcessType::VectorListType  VectorListType;
     typedef typename SparseGaussianProcessType::VectorType      VectorType;
+    typedef typename SparseGaussianProcessType::MatrixType      MatrixType;
     typedef typename SparseGaussianProcessType::KernelType         KernelType;
     typedef typename SparseGaussianProcessType::KernelTypePointer  KernelTypePointer;
     typedef typename KernelType::ParameterType                  ParameterType;
@@ -34,7 +58,7 @@ public:
     typedef typename SparseGaussianLogLikelihoodType::Pointer       SparseGaussianLogLikelihoodTypePointer;
 
 
-    typedef gpr::GaussianKernel<double>             GaussianKernelType;
+    typedef gpr::GaussianKernel<double, gpr::KernelParameterType::Exponential>             GaussianKernelType;
     typedef std::shared_ptr<GaussianKernelType>     GaussianKernelTypePointer;
 
     SparseGaussianProcessInference(KernelTypePointer kernel, TScalarType jitter, TScalarType noise, TScalarType stepwidth, unsigned iterations, unsigned maxnuminducingsamples) :
@@ -60,6 +84,8 @@ public:
         SparseGaussianLogLikelihoodTypePointer sgl(new SparseGaussianLogLikelihoodType());
         sgp->ClearInducingSamples();
 
+        //sgl->DebugOn();
+
         // build randomized index vector
         std::vector<unsigned> indices;
         for(unsigned i=0; i<sgp->GetNumberOfSamples(); i++){
@@ -70,35 +96,102 @@ public:
         ParameterVectorType param_strings = sgp->GetKernel()->GetParameters();
         std::vector<double> parameters;
         for(ParameterType s : param_strings){
-            parameters.push_back(static_cast<double>(s));
+            double p;
+            std::stringstream ss;
+            ss << s;
+            ss >> p;
+            parameters.push_back(p);
         }
 
         // successively add inducing sample
+        //double current_iterations = -5;
+        std::cout << "Add inducing points: " << std::flush;
         for(unsigned i=0; i<std::min(sgp->GetNumberOfSamples(), m_MaxNumberOfInducingSamples); i++){
-            std::cout << "Add inducing point " << indices[i] << std::endl;
+            std::cout << indices[i] << ", " << std::endl;
             sgp->AddInducingSample(m_SampleVectors[indices[i]], m_LabelVectors[indices[i]]);
 
+            if(!(i%5==0)) continue;
+        //}
+        //std::cout << std::endl;
+
+
+            std::cout << "number of samples: " << sgp->GetNumberOfInducingSamples() <<  std::endl;
+
             // optimize parameters
+            //std::cout << "do " << std::exp(-current_iterations) << " iterations " << std::endl;
             for(unsigned iter=0; iter<m_NumberOfIterations; iter++){
                 try{
                     GaussianKernelTypePointer gk(new GaussianKernelType(parameters[0], parameters[1]));
                     sgp->SetKernel(gk);
 
-                    VectorType lh = (*sgl)(sgp);
-                    std::cout << "Likelihood " << lh << ", sigma/scale " << parameters[0] << "/" << parameters[1] << std::endl;
+                    std::pair<VectorType, VectorType> value_derivative = sgl->GetValueAndParameterDerivatives(sgp);
 
-                    VectorType likelihood_update = sgl->GetParameterDerivatives(sgp);
+                    VectorType lh = value_derivative.first;
+                    std::cout << "Likelihood " << lh << ",\t sigma/scale " << std::exp(parameters[0]) << "/" << std::exp(parameters[1]) << std::flush;
 
-                    for(unsigned p=0; p<parameters.size(); p++){
-                        parameters[p] += m_StepWidth * likelihood_update[p];
+
+                    VectorType likelihood_gradient = value_derivative.second;
+                    std::cout << ", Gradients: " << likelihood_gradient.adjoint() << std::flush;
+
+                    if(std::isnan(lh.sum())){
+                        throw std::string(" nan in likelihood");
                     }
+
+                    //(likelihood_update.adjoint()*likelihood_update).inverse() * likelihood_update.dot(lh)
+
+
+
+
+                    //std::cout << ", step: " << std::endl << (likelihood_gradient * likelihood_gradient.adjoint()) << std::endl;// * likelihood_gradient * lh << std::endl;
+
+
+                    //VectorType parameter_update = (pinv<MatrixType>(likelihood_gradient * likelihood_gradient.adjoint()) * likelihood_gradient);
+                    VectorType parameter_update = (pinv<MatrixType>(likelihood_gradient * likelihood_gradient.adjoint()) * likelihood_gradient);
+                    std::cout << ", inv(J'J)J': " << parameter_update.adjoint() << std::flush;
+
+                    std::cout << ", update: " << std::flush;
+                    for(unsigned p=0; p<parameters.size(); p++){
+                        TScalarType u;
+                        if(parameter_update[p]==0){
+                        //std::cout << "log gradient... " << std::endl;
+                            if(likelihood_gradient[p]>=0){
+                                u = m_StepWidth*m_StepWidth*m_StepWidth*std::log(1+likelihood_gradient[p]);
+                            }
+                            else{
+                                u = -m_StepWidth*m_StepWidth*m_StepWidth*std::log(1+std::fabs(likelihood_gradient[p]));
+                            }
+                            parameters[p] += u;
+                            std::cout << u << " " << std::flush;
+                        }
+                        else{
+                            //std::cout << "gauss newton... " << std::endl;
+                            u = parameter_update[p]*lh[0];
+                            if(u>0){
+                                 u = m_StepWidth*std::log(1+u);
+                            }
+                            else{
+                                u = -m_StepWidth*std::log(1+std::fabs(u));
+                            }
+                            parameters[p] -= u;
+                            std::cout << u << " " << std::flush;
+                        }
+                    }
+                    std::cout << std::flush;
+
+
+                    std::cout << ", new parameters: " << std::flush;
+                    for(unsigned p=0; p<parameters.size(); p++){
+                        std::cout << std::exp(parameters[p]) << ", " << std::flush;
+                    }
+                    std::cout << std::endl;
                 }
                 catch(std::string& s){
                     std::cout << "[failed] " << s << std::endl;
                     return;
                 }
             }
-        }
+            //current_iterations += 0.1;
+        } // add inducing samples
     }
 
 private:
@@ -129,12 +222,18 @@ typedef gpr::GaussianKernel<double>             GaussianKernelType;
 typedef std::shared_ptr<GaussianKernelType>     GaussianKernelTypePointer;
 
 void Test1(){
-    unsigned n = 200;
+    //Eigen::setNbThreads(1);
 
-    double noise = 0.2;
-    double jitter = 0.01;
-    double step = 1e-4;
-    unsigned iterations = 20;
+    std::cout.precision(8);
+
+    unsigned n = 10;
+
+    double noise = 0.02;
+    double jitter = 0.011;
+    double step = 1e-1;
+    //double step = 1e-10;
+    unsigned iterations = 500;
+    unsigned num_inducing_points = 20;
 
     // setup kernel and gaussian processes
 //    double sigma = 0.23;
@@ -147,7 +246,7 @@ void Test1(){
     typedef typename SparseGaussianProcessInferenceType::Pointer    SparseGaussianProcessInferenceTypePointer;
 
     GaussianKernelTypePointer gk(new GaussianKernelType(sigma, scale));
-    SparseGaussianProcessInferenceTypePointer sgpi(new SparseGaussianProcessInferenceType(gk, jitter, noise, step, iterations, n/10));
+    SparseGaussianProcessInferenceTypePointer sgpi(new SparseGaussianProcessInferenceType(gk, jitter, noise, step, iterations, num_inducing_points));
 
 
     // setup dense gaussian process
@@ -185,29 +284,88 @@ void Test1(){
 
 
     // Sparse maximum likelihood
+    //std::cout << "Sparse GP" << std::endl;
     //sgpi->Optimize();
 
+    //return;
 
     // Dense maximum likelihood
+    //std::cout << "Dense GP" << std::endl;
     {
         typedef gpr::GaussianLogLikelihood<double> GaussianLogLikelihoodType;
         typedef std::shared_ptr<GaussianLogLikelihoodType> GaussianLogLikelihoodTypePointer;
         GaussianLogLikelihoodTypePointer gl(new GaussianLogLikelihoodType());
-        //std::cout << "Likelihood before optimization: " << (*gl)(gp) << std::endl;
+        //std::cout << "Dense likelihood optimization with n=" << gp->GetNumberOfSamples() << " samples" << std::endl;
 
-        double lambda = 1e-7;
-        for(unsigned i=0; i<100; i++){
+        double step = 1e-1;
+        std::vector<double> parameters;
+        parameters.push_back(sigma);
+        parameters.push_back(scale);
+
+        for(unsigned i=0; i<iterations; i++){
             // analytical
             try{
-                GaussianKernelTypePointer gk(new GaussianKernelType(sigma, scale));
+                typedef gpr::GaussianKernel<double, gpr::KernelParameterType::Exponential>             GaussianKernelType;
+                typedef std::shared_ptr<GaussianKernelType>     GaussianKernelTypePointer;
+
+                GaussianKernelTypePointer gk(new GaussianKernelType(parameters[0], parameters[1]));
                 gp->SetKernel(gk);
+                //gp->DebugOn();
 
-                //std::cout << "Likelihood " << (*gl)(gp) << ", sigma/scale " << sigma << "/" << scale << std::endl;
+                std::pair<VectorType, VectorType> value_derivative = gl->GetValueAndParameterDerivatives(gp);
+                VectorType likelihood_gradient = value_derivative.second;
+                VectorType lh = value_derivative.first;
 
-                VectorType likelihood_update = gl->GetParameterDerivatives(gp);
+                std::cout << "Likelihood " << value_derivative.first << ", sigma/scale " << std::exp(parameters[0]) << "/" << std::exp(parameters[1]) << std::flush;
 
-                sigma += lambda * likelihood_update[0];
-                scale += lambda * likelihood_update[1];
+                std::cout << ", Gradients: " << likelihood_gradient.adjoint() << std::flush;
+
+                VectorType parameter_update = (pinv<MatrixType>(likelihood_gradient * likelihood_gradient.adjoint()) * likelihood_gradient);
+
+                std::cout << ", inf(J'J)J': " << parameter_update.adjoint() << std::flush;
+
+//                sigma += lambda * likelihood_gradient[0];
+//                scale += lambda * likelihood_gradient[1];
+
+
+
+
+
+                std::cout << ", update: " << std::flush;
+                for(unsigned p=0; p<parameters.size(); p++){
+                    double u;
+                    if(parameter_update[p]==0){
+                    //std::cout << "log gradient... " << std::endl;
+                        if(likelihood_gradient[p]>=0){
+                            u = step*step*step*std::log(1+likelihood_gradient[p]);
+                        }
+                        else{
+                            u = -step*step*step*std::log(1+std::fabs(likelihood_gradient[p]));
+                        }
+                        parameters[p] += u;
+                        std::cout << u << " " << std::flush;
+                    }
+                    else{
+                        //std::cout << "gauss newton... " << std::endl;
+                        u = parameter_update[p]*lh[0];
+                        if(u>0){
+                             u = step*std::log(1+u);
+                        }
+                        else{
+                            u = -step*std::log(1+std::fabs(u));
+                        }
+                        parameters[p] -= u;
+                        std::cout << u << " " << std::flush;
+                    }
+                }
+                std::cout << std::flush;
+
+                std::cout << ", new parameters: " << std::flush;
+                for(unsigned p=0; p<parameters.size(); p++){
+                    std::cout << std::exp(parameters[p]) << ", " << std::flush;
+                }
+                std::cout << std::endl;
+
             }
             catch(std::string& s){
                 std::cout << "[failed] " << s << std::endl;

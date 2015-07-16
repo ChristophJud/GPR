@@ -30,6 +30,8 @@
 
 namespace gpr{
 
+enum KernelParameterType {Scalar, Exponential};
+
 template <class TScalarType> class KernelFactory;
 
 /*
@@ -366,7 +368,7 @@ private:
  * - sigma is a smoothness parameter
  * - scale is the expected amplitude
  */
-template <class TScalarType>
+template <class TScalarType, KernelParameterType TKernelParameterType = KernelParameterType::Scalar>
 class GaussianKernel : public Kernel<TScalarType>{
 public:
 
@@ -376,20 +378,58 @@ public:
     typedef typename Superclass::VectorType VectorType;
     typedef typename Superclass::ParameterVectorType ParameterVectorType;
 
+
     virtual inline TScalarType operator()(const VectorType & x, const VectorType & y) const{
-        TScalarType r = (x-y).norm();
-        return m_Scale2 * std::exp(-0.5 * (r*r) / (m_Sigma2));
+        switch (TKernelParameterType) {
+
+        // standard parametrization
+        case KernelParameterType::Scalar:{
+            TScalarType r = (x-y).norm();
+            return m_Scale2 * std::exp(-0.5 * (r*r) / (m_Sigma2));
+        }
+
+        // exponential parameters to avoid negative values
+        case KernelParameterType::Exponential:{
+            TScalarType r = (x-y).norm();
+            TScalarType exp_Scale = std::exp(m_Scale);
+            TScalarType exp_Sigma = std::exp(m_Sigma);
+            return exp_Scale*exp_Scale * std::exp(-0.5 * (r*r) / (exp_Sigma*exp_Sigma));
+        }
+
+        }
+        throw std::string("GaussianKernel::operator(): reached unexpected function end.");
 	}
+
 
     virtual inline VectorType GetDerivative(const VectorType & x, const VectorType & y) const{
         VectorType D = VectorType::Zero(2);
 
-        TScalarType r = (x-y).norm();
-        TScalarType f = std::exp(-0.5 * (r*r) / (m_Sigma2));
-        D[0] = m_Scale2 * (r*r) / (m_Sigma3) * f; // to sigma
-        D[1] = 2*m_Scale * f; // to scale
-        return D;
+        switch (TKernelParameterType) {
+
+        // standard parametrization
+        case KernelParameterType::Scalar:{
+            TScalarType r = (x-y).norm();
+            TScalarType f = std::exp(-0.5 * (r*r) / (m_Sigma2));
+            D[0] = m_Scale2 * (r*r) / (m_Sigma3) * f; // to sigma
+            D[1] = 2*m_Scale * f; // to scale
+            return D;
+        }
+
+        // exponential parameters to avoid negative values
+        case KernelParameterType::Exponential:{
+            TScalarType r = (x-y).norm();
+            TScalarType r2 = r*r;
+            TScalarType f1 = std::exp(-2*m_Sigma);
+            TScalarType f2 = std::exp(2*m_Sigma);
+            D[0] = r2*std::exp(-0.5*f1*((4*m_Sigma-4*m_Scale)*f2 + r2)); // to sigma
+            D[1] = 2*std::exp(0.5*f1*(4*f2*m_Scale-r2)); // to scale
+            return D;
+        }
+
+        }
+        throw std::string("GaussianKernel::GetDerivative: reached unexpected function end.");
     }
+
 
     // for convenience the constructor can be called
     // with scalars or with strings (ParameterType)
@@ -400,6 +440,8 @@ public:
             m_Sigma3(sigma*sigma*sigma),
             m_Scale2(scale*scale){
 
+        if(sigma==0 && TKernelParameterType == KernelParameterType::Scalar) throw std::string("GaussianKernel: sigma has to be positive");
+        if(scale==0 && TKernelParameterType == KernelParameterType::Scalar) throw std::string("GaussianKernel: scale has to be positive");
         this->m_parameters.push_back(Self::P2S(m_Sigma));
         this->m_parameters.push_back(Self::P2S(m_Scale));
 	}
@@ -440,8 +482,8 @@ private:
 	GaussianKernel(const Self&); //purposely not implemented
     void operator=(const Self&); //purposely not implemented
 };
-template <class TScalarType>
-unsigned GaussianKernel<TScalarType>::m_NumberOfParameters = 2;
+template <class TScalarType, KernelParameterType TKernelParameterType>
+unsigned GaussianKernel<TScalarType, TKernelParameterType>::m_NumberOfParameters = 2;
 
 
 /*

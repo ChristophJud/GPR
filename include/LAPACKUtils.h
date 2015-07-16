@@ -34,8 +34,8 @@ void lu_inversion(double* A, int N)
     dgetrf_(&N,&N,A,&N,IPIV,&INFO);
     dgetri_(&N,A,&N,IPIV,WORK,&LWORK,&INFO);
 
-    delete IPIV;
-    delete WORK;
+    delete[] IPIV;
+    delete[] WORK;
 }
 
 void chol_inversion(double* A, int N)

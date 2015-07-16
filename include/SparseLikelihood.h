@@ -190,7 +190,7 @@ public:
 
 
         // constant term
-        TScalarType ct = -gp->GetNumberOfSamples()/2.0 * std::log(2*M_PI);
+        TScalarType ct = -(gp->GetNumberOfSamples()/2.0) * std::log(2*M_PI);
 
         if(this->debug){
             std::cout << "Knn trace: " << Knn_trace << std::endl;
@@ -266,8 +266,124 @@ public:
             TScalarType dTheta_i = -0.5/gp->GetSigmaSquared() * (Knn_d_trace[p] - A.block(p*n, 0, n, n).trace());
             sr[p] = dTheta_i;
         }
-
         return dt + ct + sr;
+    }
+
+    virtual inline std::pair<VectorType, VectorType> GetValueAndParameterDerivatives(const SparseGaussianProcessTypePointer gp) const{
+        //------------------------------------
+        // get all the important matrices
+        MatrixType K;
+        MatrixType K_inv;
+        MatrixType Knm;
+        DiagMatrixType I_sigma;
+
+        this->GetCoreMatrices(gp, K, K_inv, Knm, I_sigma);
+
+
+//        std::cout << "Kernel matrix: " << std::endl;
+//        std::cout << K << std::endl;
+//        std::cout << "Kernel matrix inverted: " << std::endl;
+//        std::cout << K_inv << std::endl;
+
+        MatrixType Y;
+        this->GetLabelMatrix(gp, Y);
+
+        VectorType Knn_d_trace = this->GetDerivativeKernelMatrixTrace(gp);
+
+        MatrixType C_inv;
+        EfficientInversion(gp, C_inv, I_sigma, K_inv, K, Knm); // inv(I_sigma + Knm inv(Kmm) Kmn)
+
+        //----------------------------------------------------
+        // data fit term
+        VectorType df_value = -0.5 * (Y.adjoint() * C_inv * Y);
+
+        // data fit gradient
+        // compute: -0.5 Y' inv(C) grad(C) inv(C) Y
+        MatrixType Kmm_d;
+        this->GetDerivativeKernelMatrix(gp, Kmm_d);
+
+        MatrixType Knm_d;
+        this->GetDerivativeKernelVectorMatrix(gp, Knm_d);
+
+        unsigned num_params = gp->GetKernel()->GetNumberOfParameters();
+        unsigned n = gp->GetNumberOfSamples();
+        unsigned m = gp->GetNumberOfInducingSamples();
+
+        MatrixType A; // grad(C)
+        A.resize(num_params*n, n);
+        for(unsigned p=0; p<num_params; p++){
+            A.block(p*n, 0, n, n) = Knm_d.block(p*n, 0, n, m) * K_inv * Knm.adjoint() -
+                                    Knm * K_inv * Kmm_d.block(p*m, 0, m, m) * K_inv * Knm.adjoint() +
+                                    Knm * K_inv * Knm_d.block(p*n, 0, n, m).adjoint();
+        }
+
+        VectorType df_grad =  VectorType::Zero(num_params);
+        for(unsigned p=0; p<num_params; p++){
+            VectorType dTheta_i = 0.5*Y.adjoint()*C_inv*A.block(p*n, 0, n, n)*C_inv*Y;
+            if(dTheta_i.rows() != 1) throw std::string("SparseLikelihood::GetParameterDerivatives: dimension missmatch in calculating derivative of data fit term");
+            df_grad[p] = dTheta_i[0];
+        }
+
+
+        //----------------------------------------------------
+        // complexity penalty (parameter regularizer)
+        TScalarType determinant = this->EfficientDeterminant(I_sigma, K_inv, K, Knm);
+        if(determinant < -std::numeric_limits<double>::epsilon()){
+            std::stringstream ss;
+            ss << "SparseGaussianLogLikelihood: determinant of K is smaller than zero: " << determinant;
+            throw ss.str();
+        }
+        TScalarType cp_value;
+
+        if(determinant <= 0){
+            cp_value = -0.5 * std::log(std::numeric_limits<double>::min());
+        }
+        else{
+            cp_value = -0.5 * std::log(determinant);
+        }
+
+        // complexity penalty derivative
+        VectorType cp_grad =  VectorType::Zero(num_params);
+        for(unsigned p=0; p<num_params; p++){
+            TScalarType dTheta_i = -0.5 * (C_inv * A.block(p*n, 0, n, n)).trace();
+            cp_grad[p] = dTheta_i;
+        }
+
+        //----------------------------------------------------
+        // inducing sample regularization term
+        MatrixType C;
+        this->GetCoreMatrix(gp, C, K_inv, Knm);
+
+        TScalarType Knn_trace = this->GetKernelMatrixTrace(gp);
+
+        TScalarType sr_value = -0.5/gp->GetSigmaSquared() * (Knn_trace - C.trace());
+        //std::cout << "Knn_trace: " << Knn_trace << ", C.trace " << C.trace() << std::endl;
+
+        // inducing sample reg term derivative
+        VectorType sr_grad =  VectorType::Zero(num_params);
+        for(unsigned p=0; p<num_params; p++){
+            TScalarType dTheta_i = -0.5/gp->GetSigmaSquared() * (Knn_d_trace[p] - A.block(p*n, 0, n, n).trace());
+            sr_grad[p] = dTheta_i;
+        }
+
+        //----------------------------------------------------
+        // constant term
+        TScalarType ct_value = -(gp->GetNumberOfSamples()/2.0) * std::log(2*M_PI);
+
+
+        // full value
+        VectorType values = df_value.array() + (cp_value + ct_value + sr_value);
+
+        if(std::isinf(values[0])){
+            std::cout << "df: " << df_value << ", cp: " << cp_value << ", ct: " << ct_value << ", sr: " << sr_value << std::endl;
+        }
+
+        // full gradient
+        VectorType derivatives = df_grad + cp_grad + sr_grad;
+
+        //std::cout << "df: " << df_grad.adjoint() << ", cp: " << cp_grad.adjoint() << ", " << sr_grad.adjoint() << std::endl;
+
+        return std::make_pair(values, derivatives);
     }
 
     SparseGaussianLogLikelihood() : Superclass(){  }
