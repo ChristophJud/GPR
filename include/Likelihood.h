@@ -42,9 +42,18 @@ public:
     typedef typename GaussianProcessType::VectorType VectorType;
     typedef typename GaussianProcessType::MatrixType MatrixType;
     typedef typename GaussianProcessType::DiagMatrixType DiagMatrixType;
+    typedef typename std::pair<VectorType,VectorType> ValueDerivativePair;
 
     virtual inline VectorType operator()(const GaussianProcessTypePointer gp) const{
         throw std::string("Likelihood: operator() is not implemented.");
+    }
+
+    virtual inline VectorType GetParameterDerivatives(const GaussianProcessTypePointer gp) const{
+        throw std::string("Likelihood: GetParameterDerivatives is not implemented.");
+    }
+
+    virtual inline ValueDerivativePair GetValueAndParameterDerivatives(const GaussianProcessTypePointer gp) const{
+        throw std::string("Likelihood: GetValueAndParameterDerivatives is not implemented.");
     }
 
     virtual std::string ToString() const = 0;
@@ -142,6 +151,7 @@ public:
     typedef typename Superclass::VectorType VectorType;
     typedef typename Superclass::MatrixType MatrixType;
     typedef typename Superclass::GaussianProcessTypePointer GaussianProcessTypePointer;
+    typedef typename Superclass::ValueDerivativePair ValueDerivativePair;
 
     virtual inline VectorType operator()(const GaussianProcessTypePointer gp) const{
         MatrixType Y; // label matrix
@@ -155,15 +165,13 @@ public:
         VectorType df = -0.5 * (Y.adjoint() * C * Y);
 
         // complexity penalty
-        if(determinant < -std::numeric_limits<double>::epsilon()){
-            std::stringstream ss;
-            ss << "GaussianLogLikelihood: determinant of K is smaller than zero: " << determinant;
-            throw ss.str();
-        }
         TScalarType cp;
 
-        if(determinant <= 0){
+        if(determinant <= std::numeric_limits<double>::min()){
             cp = -0.5 * std::log(std::numeric_limits<double>::min());
+        }
+        else if(determinant > std::numeric_limits<double>::max()){
+            cp = -0.5 * std::log(std::numeric_limits<double>::max());
         }
         else{
             cp = -0.5 * std::log(determinant);
@@ -173,7 +181,14 @@ public:
         // constant term
         TScalarType ct = -C.rows()/2.0 * std::log(2*M_PI);
 
-        return df.array() + (cp + ct);
+
+        VectorType value = df.array() + (cp + ct);
+        if(std::isinf(value.array().sum())){
+            std::cout << "df: " << df << ", cp: " << cp << ", ct: " << ct << ", determinant: " << determinant << std::endl;
+            throw std::string("GaussianLogLikelihood::GetValueAndParameterDerivatives: likelihood is infinite.");
+        }
+
+        return value;
     }
 
     virtual inline VectorType GetParameterDerivatives(const GaussianProcessTypePointer gp) const{
@@ -203,7 +218,7 @@ public:
         return delta;
     }
 
-    virtual inline std::pair<VectorType,VectorType> GetValueAndParameterDerivatives(const GaussianProcessTypePointer gp) const{
+    virtual inline ValueDerivativePair GetValueAndParameterDerivatives(const GaussianProcessTypePointer gp) const{
         MatrixType Y; // label matrix
         this->GetLabelMatrix(gp, Y);
 
@@ -215,11 +230,6 @@ public:
         VectorType df = -0.5 * (Y.adjoint() * C * Y);
 
         // complexity penalty
-//        if(determinant < -std::numeric_limits<double>::epsilon()){
-//            std::stringstream ss;
-//            ss << "GaussianLogLikelihood: determinant of K is smaller than zero: " << determinant;
-//            throw ss.str();
-//        }
         TScalarType cp;
 
         if(determinant <= std::numeric_limits<double>::min()){
