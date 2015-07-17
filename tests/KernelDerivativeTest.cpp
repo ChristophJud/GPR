@@ -37,12 +37,11 @@ typedef std::shared_ptr<GaussianProcessType> GaussianProcessTypePointer;
 typedef typename GaussianProcessType::VectorType VectorType;
 typedef typename GaussianProcessType::MatrixType MatrixType;
 
-template<KernelParameterType T>
 void Test1(){
     /*
      * Test 1: derivative test of kernels
      */
-    std::cout << "Test 1: gaussian kernel derivative... " << std::flush;
+    std::cout << "Test 1.1: gaussian kernel derivative... " << std::flush;
 
     VectorType x = VectorType::Zero(2);
     x(0) = 0.1; x(1) = 0.5;
@@ -52,7 +51,7 @@ void Test1(){
 
 
     // typedefs
-    typedef GaussianKernel<ScalarType, T>    GaussianKernelType;
+    typedef GaussianKernel<ScalarType>    GaussianKernelType;
     typedef std::shared_ptr<GaussianKernelType>                 GaussianKernelTypePointer;
 
     double h = 0.001;
@@ -83,26 +82,70 @@ void Test1(){
         }
     }
 
-    if(T == KernelParameterType::Scalar){
-        if(err[0]/counter < 1e-5 && err[1]/counter < 1e-12){
-            std::cout << "\t[passed]." << std::endl;
-        }
-        else{
-            std::cout << "\t[failed] with an error (sigma) " << err[0]/counter << " and (scale) " << err[1]/counter << std::endl;
-        }
-        return;
-    }
-    if(T == KernelParameterType::Exponential){
-        if(err[0]/counter < 1e-6 && err[1]/counter < 1e-3){
-            std::cout << "\t[passed]." << std::endl;
-        }
-        else{
-            std::cout << "\t[failed] with an error (sigma) " << err[0]/counter << " and (scale) " << err[1]/counter << std::endl;
-        }
-        return;
-    }
-    std::cout << "\t[failed] unexpected end" << std::endl;
 
+    if(err[0]/counter < 1e-5 && err[1]/counter < 1e-12){
+        std::cout << "\t[passed]." << std::endl;
+    }
+    else{
+        std::cout << "\t[failed] with an error (sigma) " << err[0]/counter << " and (scale) " << err[1]/counter << std::endl;
+    }
+    return;
+
+
+}
+
+void Test1_2(){
+    /*
+     * Test 1.2: derivative test of kernels
+     */
+    std::cout << "Test 1.2: gaussian kernel derivative with exponentiated parameters... " << std::flush;
+
+    VectorType x = VectorType::Zero(2);
+    x(0) = 0.1; x(1) = 0.5;
+
+    VectorType y = VectorType::Zero(2);
+    y(0) = -0.1; y(1) = 0.8;
+
+
+    // typedefs
+    typedef GaussianExpKernel<ScalarType>           GaussianExpKernelType;
+    typedef std::shared_ptr<GaussianExpKernelType>  GaussianExpKernelTypePointer;
+
+    double h = 0.001;
+    VectorType err = VectorType::Zero(2);
+    unsigned counter = 0;
+    for(double sigma=0.1; sigma<10; sigma+=0.4){
+        for(double scale=0.1; scale<3; scale+=0.8){
+            // analytical derivative
+            GaussianExpKernelTypePointer gk(new GaussianExpKernelType(sigma, scale));
+            VectorType D = gk->GetDerivative(x,y);
+
+            // scale central difference
+            GaussianExpKernelTypePointer gk1_scale(new GaussianExpKernelType(sigma, scale+h/2));
+            GaussianExpKernelTypePointer gk2_scale(new GaussianExpKernelType(sigma, scale-h/2));
+            double cd_scale = (*gk1_scale)(x,y) - (*gk2_scale)(x,y);
+            cd_scale/=h;
+
+            // sigma central difference
+            GaussianExpKernelTypePointer gk1_sigma(new GaussianExpKernelType(sigma+h/2, scale));
+            GaussianExpKernelTypePointer gk2_sigma(new GaussianExpKernelType(sigma-h/2, scale));
+            double cd_sigma = (*gk1_sigma)(x,y) - (*gk2_sigma)(x,y);
+            cd_sigma/=h;
+
+            err[0] += std::fabs(cd_sigma-D[0]);
+            err[1] += std::fabs(cd_scale-D[1]);
+
+            counter++;
+        }
+    }
+
+    if(err[0]/counter < 1e-6 && err[1]/counter < 1e-3){
+        std::cout << "\t[passed]." << std::endl;
+    }
+    else{
+        std::cout << "\t[failed] with an error (sigma) " << err[0]/counter << " and (scale) " << err[1]/counter << std::endl;
+    }
+    return;
 }
 
 void Test2(){
@@ -489,8 +532,8 @@ void Test6(){
 int main (int argc, char *argv[]){
     std::cout << "Product kernel test: " << std::endl;
     try{
-        Test1<KernelParameterType::Scalar>();
-        Test1<KernelParameterType::Exponential>();
+        Test1();
+        Test1_2();
         Test2();
         Test3();
         Test4();

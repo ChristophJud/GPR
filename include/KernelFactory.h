@@ -72,6 +72,7 @@ public:
     static void RegisterKernels(){
         KernelFactory<TScalarType>::AddType< WhiteKernel<TScalarType> >(std::string("WhiteKernel"));
         KernelFactory<TScalarType>::AddType< GaussianKernel<TScalarType> >(std::string("GaussianKernel"));
+        KernelFactory<TScalarType>::AddType< GaussianExpKernel<TScalarType> >(std::string("GaussianExpKernel"));
         KernelFactory<TScalarType>::AddType< PeriodicKernel<TScalarType> >(std::string("PeriodicKernel"));
         KernelFactory<TScalarType>::AddType< RationalQuadraticKernel<TScalarType> >(std::string("RationalQuadraticKernel"));
         KernelFactory<TScalarType>::AddType< SumKernel<TScalarType> >(std::string("SumKernel"));
@@ -139,6 +140,13 @@ public:
 
         if(kernel_type.compare("GaussianKernel")==0){
             typedef GaussianKernel<TScalarType>		KernelType;
+            typedef std::shared_ptr<KernelType>     KernelTypePointer;
+
+            KernelTypePointer k = std::dynamic_pointer_cast<KernelType>(KernelFactory<TScalarType>::Load(kernel_type, kernel_parameters));
+            return k;
+        }
+        else if(kernel_type.compare("GaussianExpKernel")==0){
+            typedef GaussianExpKernel<TScalarType>		KernelType;
             typedef std::shared_ptr<KernelType>     KernelTypePointer;
 
             KernelTypePointer k = std::dynamic_pointer_cast<KernelType>(KernelFactory<TScalarType>::Load(kernel_type, kernel_parameters));

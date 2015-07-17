@@ -29,14 +29,14 @@
 namespace gpr{
 template <class TScalarType> class Likelihood;
 
-template< class TScalarType >
+template< class TScalarType>
 class GaussianProcess
 {
 public:
 	typedef GaussianProcess Self;
     typedef std::shared_ptr<Self> Pointer;
 	typedef Kernel<TScalarType> KernelType;
-    typedef std::shared_ptr<KernelType> KernelTypePointer;
+    typedef typename KernelType::Pointer KernelTypePointer;
 
     typedef Eigen::Matrix<TScalarType, Eigen::Dynamic, 1> VectorType;
     typedef Eigen::Matrix<TScalarType, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> MatrixType;

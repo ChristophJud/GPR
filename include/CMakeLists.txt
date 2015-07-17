@@ -10,6 +10,7 @@ INSTALL(FILES
 	PriorUtils.h
 	LAPACKUtils.h
 	SparseGaussianProcess.h
+	GaussianProcessInference.h
 DESTINATION
 	include
 PERMISSIONS

@@ -42,7 +42,7 @@ class Kernel{
 public:
 
 	typedef Kernel Self;
-    typedef std::shared_ptr<Self> SelfPointer;
+    typedef std::shared_ptr<Self> Pointer;
 	typedef Eigen::Matrix<TScalarType, Eigen::Dynamic, 1> VectorType;
     typedef std::vector<TScalarType> ParameterVectorType;
     typedef std::string StringParameterType;
@@ -154,9 +154,9 @@ class SumKernel : public Kernel<TScalarType>{
 public:
 
     typedef Kernel<TScalarType> Superclass;
-    typedef typename Superclass::SelfPointer SuperclassPointer;
+    typedef typename Superclass::Pointer SuperclassPointer;
     typedef SumKernel Self;
-    typedef std::shared_ptr<Self> SelfPointer;
+    typedef std::shared_ptr<Self> Pointer;
     typedef typename Superclass::VectorType VectorType;
     typedef typename Superclass::ParameterVectorType    ParameterVectorType;
     typedef typename Superclass::StringParameterType StringParameterType;
@@ -201,7 +201,7 @@ public:
 
     // Needed from the KernelFactory to instantiate
     // a kernel given a parameter vector;
-    static SelfPointer Load(const StringParameterVectorType& parameters){
+    static Pointer Load(const StringParameterVectorType& parameters){
         if(parameters.size() < 4){
             throw std::string("SumKernel::Load: wrong number of kernel parameters.");
         }
@@ -228,7 +228,7 @@ public:
         }
 
         // return a sum kernel where the summands are loaded from the kernel factory
-        return SelfPointer(new Self(KernelFactory<TScalarType>::Load(ks1, params1),
+        return Pointer(new Self(KernelFactory<TScalarType>::Load(ks1, params1),
                         KernelFactory<TScalarType>::Load(ks2, params2)));
     }
 
@@ -303,9 +303,9 @@ class ProductKernel : public Kernel<TScalarType>{
 public:
 
     typedef Kernel<TScalarType> Superclass;
-    typedef typename Superclass::SelfPointer SuperclassPointer;
+    typedef typename Superclass::Pointer SuperclassPointer;
     typedef ProductKernel Self;
-    typedef std::shared_ptr<Self> SelfPointer;
+    typedef std::shared_ptr<Self> Pointer;
     typedef typename Superclass::VectorType VectorType;
     typedef typename Superclass::ParameterVectorType    ParameterVectorType;
     typedef typename Superclass::StringParameterType StringParameterType;
@@ -349,7 +349,7 @@ public:
 
     // Needed from the KernelFactory to instantiate
     // a kernel given a parameter vector;
-    static SelfPointer Load(const StringParameterVectorType& parameters){
+    static Pointer Load(const StringParameterVectorType& parameters){
         if(parameters.size() < 4){
             throw std::string("ProductKernel::Load: wrong number of kernel parameters.");
         }
@@ -376,7 +376,7 @@ public:
         }
 
         // return a sum kernel where the summands are loaded from the kernel factory
-        return SelfPointer(new Self(KernelFactory<TScalarType>::Load(ks1, params1),
+        return Pointer(new Self(KernelFactory<TScalarType>::Load(ks1, params1),
                         KernelFactory<TScalarType>::Load(ks2, params2)));
     }
 
@@ -450,69 +450,33 @@ private:
  * - sigma is a smoothness parameter
  * - scale is the expected amplitude
  */
-template <class TScalarType, KernelParameterType TKernelParameterType = KernelParameterType::Scalar>
+template <class TScalarType>
 class GaussianKernel : public Kernel<TScalarType>{
 public:
 
     typedef Kernel<TScalarType> Superclass;
     typedef GaussianKernel Self;
-    typedef std::shared_ptr<Self> SelfPointer;
+    typedef std::shared_ptr<Self> Pointer;
     typedef typename Superclass::VectorType VectorType;
     typedef typename Superclass::ParameterVectorType    ParameterVectorType;
     typedef typename Superclass::StringParameterVectorType StringParameterVectorType;
 
 
     virtual inline TScalarType operator()(const VectorType & x, const VectorType & y) const{
-        switch (TKernelParameterType) {
-
-        // standard parametrization
-        case KernelParameterType::Scalar:{
-            TScalarType r = (x-y).norm();
-            return m_Scale2 * std::exp(-0.5 * (r*r) / (m_Sigma2));
-        }
-
-        // exponential parameters to avoid negative values
-        case KernelParameterType::Exponential:{
-            TScalarType r = (x-y).norm();
-            TScalarType exp_Scale = std::exp(m_Scale);
-            TScalarType exp_Sigma = std::exp(m_Sigma);
-            return exp_Scale*exp_Scale * std::exp(-0.5 * (r*r) / (exp_Sigma*exp_Sigma));
-        }
-
-        }
-        throw std::string("GaussianKernel::operator(): reached unexpected function end.");
-	}
+        TScalarType r = (x-y).norm();
+        return m_Scale2 * std::exp(-0.5 * (r*r) / (m_Sigma2));
+    }
 
 
     virtual inline VectorType GetDerivative(const VectorType & x, const VectorType & y) const{
         VectorType D = VectorType::Zero(2);
 
-        switch (TKernelParameterType) {
-
-        // standard parametrization
-        case KernelParameterType::Scalar:{
-            TScalarType r = (x-y).norm();
-            TScalarType f = std::exp(-0.5 * (r*r) / (m_Sigma2));
-            D[0] = m_Scale2 * (r*r) / (m_Sigma3) * f; // to sigma
-            D[1] = 2*m_Scale * f; // to scale
-            return D;
-        }
-
-        // exponential parameters to avoid negative values
-        case KernelParameterType::Exponential:{
-            TScalarType r = (x-y).norm();
-            TScalarType r2 = r*r;
-            TScalarType f1 = std::exp(-2*m_Sigma);
-            TScalarType f2 = std::exp(2*m_Sigma);
-            D[0] = r2*std::exp(-0.5*f1*((4*m_Sigma-4*m_Scale)*f2 + r2)); // to sigma
-            D[1] = 2*std::exp(0.5*f1*(4*f2*m_Scale-r2)); // to scale
-            return D;
-        }
-
-        }
-        throw std::string("GaussianKernel::GetDerivative: reached unexpected function end.");
+        TScalarType r = (x-y).norm();
+        TScalarType f = std::exp(-0.5 * (r*r) / (m_Sigma2));
+        D[0] = m_Scale2 * (r*r) / (m_Sigma3) * f; // to sigma
+        D[1] = 2*m_Scale * f; // to scale
+        return D;
     }
-
 
     // for convenience the constructor can be called
     // with scalars or with strings (StringParameterType)
@@ -536,11 +500,11 @@ public:
 
     // Needed from the KernelFactory to instantiate
     // a kernel given a parameter vector;
-    static SelfPointer Load(const StringParameterVectorType& parameters){
+    static Pointer Load(const StringParameterVectorType& parameters){
         if(parameters.size() != m_NumberOfParameters){
             throw std::string("GaussianKernel::Load: wrong number of kernel parameters.");
         }
-        return SelfPointer(new Self(Self::S2P(parameters[0]), Self::S2P(parameters[1])));
+        return Pointer(new Self(Self::S2P(parameters[0]), Self::S2P(parameters[1])));
     }
 
     virtual unsigned GetNumberOfParameters() const{
@@ -562,8 +526,8 @@ protected:
                               TScalarType& sigma2,
                               TScalarType& sigma3,
                               TScalarType& scale2){
-        if(sigma==0 && TKernelParameterType == KernelParameterType::Scalar) throw std::string("GaussianKernel: sigma has to be positive");
-        if(scale==0 && TKernelParameterType == KernelParameterType::Scalar) throw std::string("GaussianKernel: scale has to be positive");
+        if(sigma==0) throw std::string("GaussianKernel: sigma has to be positive");
+        if(scale==0) throw std::string("GaussianKernel: scale has to be positive");
 
         sigma = parameters[0];
         scale = parameters[1];
@@ -577,7 +541,7 @@ protected:
         stringparameters.push_back(Self::P2S(scale));
     }
 
-private:
+
     TScalarType m_Sigma;
     TScalarType m_Scale;
 
@@ -587,12 +551,129 @@ private:
 
     static unsigned m_NumberOfParameters;
 	
+private:
 	GaussianKernel(const Self&); //purposely not implemented
     void operator=(const Self&); //purposely not implemented
 };
-template <class TScalarType, KernelParameterType TKernelParameterType>
-unsigned GaussianKernel<TScalarType, TKernelParameterType>::m_NumberOfParameters = 2;
+template <class TScalarType>
+unsigned GaussianKernel<TScalarType>::m_NumberOfParameters = 2;
 
+
+/*
+ * Gaussian Kernel: k(x,y) = scale^2 * exp( -0.5||x-y||^2 / sigma^2 )
+ *
+ * - sigma is a smoothness parameter
+ * - scale is the expected amplitude
+ */
+template <class TScalarType>
+class GaussianExpKernel : public Kernel<TScalarType>{
+public:
+
+    typedef Kernel<TScalarType> Superclass;
+    typedef GaussianExpKernel Self;
+    typedef std::shared_ptr<Self> Pointer;
+    typedef typename Superclass::VectorType VectorType;
+    typedef typename Superclass::ParameterVectorType    ParameterVectorType;
+    typedef typename Superclass::StringParameterVectorType StringParameterVectorType;
+
+
+    virtual inline TScalarType operator()(const VectorType & x, const VectorType & y) const{
+        TScalarType r = (x-y).norm();
+        TScalarType exp_Scale = std::exp(m_Scale);
+        TScalarType exp_Sigma = std::exp(m_Sigma);
+        return exp_Scale*exp_Scale * std::exp(-0.5 * (r*r) / (exp_Sigma*exp_Sigma));
+    }
+
+
+    virtual inline VectorType GetDerivative(const VectorType & x, const VectorType & y) const{
+        VectorType D = VectorType::Zero(2);
+
+        TScalarType r = (x-y).norm();
+        TScalarType r2 = r*r;
+        TScalarType f1 = std::exp(-2*m_Sigma);
+        TScalarType f2 = std::exp(2*m_Sigma);
+        D[0] = r2*std::exp(-0.5*f1*((4*m_Sigma-4*this->m_Scale)*f2 + r2)); // to sigma
+        D[1] = 2*std::exp(0.5*f1*(4*f2*m_Scale-r2)); // to scale
+        return D;
+    }
+
+    // for convenience the constructor can be called
+    // with scalars or with strings (StringParameterType)
+    GaussianExpKernel(TScalarType sigma, TScalarType scale=1) : Superclass(),
+            m_Sigma(sigma),
+            m_Scale(scale){
+        this->m_Parameters.push_back(m_Sigma);
+        this->m_Parameters.push_back(m_Scale);
+        SetParameters(this->m_Parameters, this->m_StringParameters, m_Sigma, m_Scale, m_Sigma2, m_Sigma3, m_Scale2);
+    }
+    GaussianExpKernel(const typename Superclass::StringParameterType& p1,
+                   const typename Superclass::StringParameterType& p2) :
+        GaussianExpKernel(Self::S2P(p1), Self::S2P(p2)){
+    }
+
+    virtual ~GaussianExpKernel() {}
+
+    virtual std::string ToString() const{
+        return "GaussianExpKernel("+Superclass::ParametersToString(this->m_StringParameters)+")";
+    } // needed for identification
+
+    // Needed from the KernelFactory to instantiate
+    // a kernel given a parameter vector;
+    static Pointer Load(const StringParameterVectorType& parameters){
+        if(parameters.size() != m_NumberOfParameters){
+            throw std::string("GaussianExpKernel::Load: wrong number of kernel parameters.");
+        }
+        return Pointer(new Self(Self::S2P(parameters[0]), Self::S2P(parameters[1])));
+    }
+
+    virtual unsigned GetNumberOfParameters() const{
+        return m_NumberOfParameters;
+    }
+
+    virtual void SetParameters(const ParameterVectorType& parameters){
+        if(parameters.size() != this->GetNumberOfParameters()){
+            throw std::string("GaussianExpKernel::SetParameters: wrong number of parameters.");
+        }
+        this->m_Parameters = parameters;
+        SetParameters(parameters, this->m_StringParameters, m_Sigma, m_Scale, m_Sigma2, m_Sigma3, m_Scale2);
+    }
+
+protected:
+    static void SetParameters(const ParameterVectorType& parameters, StringParameterVectorType& stringparameters,
+                              TScalarType& sigma,
+                              TScalarType& scale,
+                              TScalarType& sigma2,
+                              TScalarType& sigma3,
+                              TScalarType& scale2){
+
+        sigma = parameters[0];
+        scale = parameters[1];
+
+        sigma2 = sigma*sigma;
+        sigma3 = sigma*sigma*sigma;
+        scale2 = scale*scale;
+
+        stringparameters.clear();
+        stringparameters.push_back(Self::P2S(sigma));
+        stringparameters.push_back(Self::P2S(scale));
+    }
+
+
+    TScalarType m_Sigma;
+    TScalarType m_Scale;
+
+    TScalarType m_Sigma2;
+    TScalarType m_Sigma3;
+    TScalarType m_Scale2;
+
+    static unsigned m_NumberOfParameters;
+
+private:
+    GaussianExpKernel(const Self&); //purposely not implemented
+    void operator=(const Self&); //purposely not implemented
+};
+template <class TScalarType>
+unsigned GaussianExpKernel<TScalarType>::m_NumberOfParameters = 2;
 
 /*
  * White Kernel: k(x,y) = scale^2 * delta
@@ -606,7 +687,7 @@ public:
 
     typedef Kernel<TScalarType> Superclass;
     typedef WhiteKernel Self;
-    typedef std::shared_ptr<Self> SelfPointer;
+    typedef std::shared_ptr<Self> Pointer;
     typedef typename Superclass::VectorType VectorType;
     typedef typename Superclass::ParameterVectorType    ParameterVectorType;
     typedef typename Superclass::StringParameterVectorType StringParameterVectorType;
@@ -650,11 +731,11 @@ public:
 
     // Needed from the KernelFactory to instantiate
     // a kernel given a parameter vector;
-    static SelfPointer Load(const StringParameterVectorType& parameters){
+    static Pointer Load(const StringParameterVectorType& parameters){
         if(parameters.size() != m_NumberOfParameters){
-            throw std::string("GaussianKernel::Load: wrong number of kernel parameters.");
+            throw std::string("WhiteKernel::Load: wrong number of kernel parameters.");
         }
-        return SelfPointer(new Self(Self::S2P(parameters[0])));
+        return Pointer(new Self(Self::S2P(parameters[0])));
     }
 
     virtual unsigned GetNumberOfParameters() const{
@@ -705,7 +786,7 @@ public:
 
     typedef Kernel<TScalarType> Superclass;
     typedef RationalQuadraticKernel Self;
-    typedef std::shared_ptr<Self> SelfPointer;
+    typedef std::shared_ptr<Self> Pointer;
     typedef typename Superclass::VectorType VectorType;
     typedef typename Superclass::ParameterVectorType    ParameterVectorType;
     typedef typename Superclass::StringParameterVectorType StringParameterVectorType;
@@ -751,11 +832,11 @@ public:
 
     // Needed from the KernelFactory to instantiate
     // a kernel given a parameter vector;
-    static SelfPointer Load(const StringParameterVectorType& parameters){
+    static Pointer Load(const StringParameterVectorType& parameters){
         if(parameters.size() != m_NumberOfParameters){
             throw std::string("RationalQuadraticKernel::Load: wrong number of kernel parameters.");
         }
-        return SelfPointer(new Self(Self::S2P(parameters[0]), Self::S2P(parameters[1]), Self::S2P(parameters[2])));
+        return Pointer(new Self(Self::S2P(parameters[0]), Self::S2P(parameters[1]), Self::S2P(parameters[2])));
     }
 
     virtual unsigned GetNumberOfParameters() const{
@@ -823,7 +904,7 @@ public:
 
     typedef Kernel<TScalarType> Superclass;
     typedef PeriodicKernel Self;
-    typedef std::shared_ptr<Self> SelfPointer;
+    typedef std::shared_ptr<Self> Pointer;
     typedef typename Superclass::VectorType VectorType;
     typedef typename Superclass::ParameterVectorType    ParameterVectorType;
     typedef typename Superclass::StringParameterVectorType StringParameterVectorType;
@@ -892,11 +973,11 @@ public:
 
     // Needed from the KernelFactory to instantiate
     // a kernel given a parameter vector;
-    static SelfPointer Load(const StringParameterVectorType& parameters){
+    static Pointer Load(const StringParameterVectorType& parameters){
         if(parameters.size() != m_NumberOfParameters){
             throw std::string("PeriodicKernel::Load: wrong number of kernel parameters.");
         }
-        return SelfPointer(new Self(Self::S2P(parameters[0]), Self::S2P(parameters[1]), Self::S2P(parameters[2])));
+        return Pointer(new Self(Self::S2P(parameters[0]), Self::S2P(parameters[1]), Self::S2P(parameters[2])));
     }
 
     virtual unsigned GetNumberOfParameters() const{
