@@ -136,13 +136,47 @@ void Test1(){
 }
 
 
+template<typename T>
+void Test2(){
+    // typedefs
+    typedef GaussianKernel<T>                   GaussianKernelType;
+    typedef std::shared_ptr<GaussianKernelType>         GaussianKernelTypePointer;
+    typedef PeriodicKernel<T>                   PeriodicKernelType;
+    typedef std::shared_ptr<PeriodicKernelType>         PeriodicKernelTypePointer;
+    typedef ProductKernel<T>                        ProductKernelType;
+    typedef std::shared_ptr<ProductKernelType>      ProductKernelTypePointer;
+
+
+    PeriodicKernelTypePointer   pk(new PeriodicKernelType(0.59, 0.5, 0.4));
+    GaussianKernelTypePointer   gk(new GaussianKernelType(132, M_PI));
+    ProductKernelTypePointer        sk(new ProductKernelType(pk, gk));
+
+    ProductKernelTypePointer sk2(new ProductKernelType(PeriodicKernelTypePointer(new PeriodicKernelType(1, 1, 1)),
+                                               GaussianKernelTypePointer(new GaussianKernelType(1, 1))));
+
+    sk2->SetParameters(sk->GetParameters());
+
+    if((*sk) != (*sk2)){
+        std::cout << " [failed]." << std::endl;
+    }
+    else{
+        std::cout << " [passed]." << std::endl;
+    }
+
+}
+
 int main (int argc, char *argv[]){
 
     try{
-        std::cout << "Product kernel test (float): " << std::endl;
+        std::cout << "Test 1: Product kernel test (float): " << std::endl;
         Test1<float>();
-        std::cout << "Product kernel test (double): " << std::endl;
+        std::cout << "Test 1: Product kernel test (double): " << std::endl;
         Test1<double>();
+
+        std::cout << "Test 2: parameter test with product kernel (float) " << std::flush;
+        Test2<float>();
+        std::cout << "Test 2: parameter test with product kernel (double) " << std::flush;
+        Test2<double>();
     }
     catch(std::string& s){
         std::cout << "Error: " << s << std::endl;

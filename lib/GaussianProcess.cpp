@@ -281,8 +281,8 @@ void GaussianProcess<TScalarType>::ToString() const{
     std::cout << " - Kernel:" << std::endl;
     std::cout << "       - Type:\t\t" << m_Kernel->ToString() << std::endl;
     std::cout << "       - Parameter:\t";
-    for(unsigned i=0; i<m_Kernel->GetParameters().size(); i++){
-        std::cout << m_Kernel->GetParameters()[i] << ", ";
+    for(unsigned i=0; i<m_Kernel->GetStringParameters().size(); i++){
+        std::cout << m_Kernel->GetStringParameters()[i] << ", ";
     }
     std::cout << std::endl;
     std::cout << "---------------------------------------" << std::endl;

@@ -153,11 +153,27 @@ void Test2(){
     }
 }
 
+void Test3(){
+    std::cout << "Test 3: parameter test..." << std::flush;
+
+    KernelTypePointer k(new KernelType(4, 2.5, 0.01)); // scale, period, smoothness
+    KernelTypePointer k2(new KernelType(1, 1, 1)); // scale, period, smoothness
+
+    k2->SetParameters(k->GetParameters());
+
+    if((*k) != (*k2)){
+        std::cout << " [failed]." << std::endl;
+    }
+    else{
+        std::cout << " [passed]." << std::endl;
+    }
+}
 
 int main (int argc, char *argv[]){
     std::cout << "Periodic kernel test: " << std::endl;
     Test1();
     Test2();
+    Test3();
 
     return 0;
 }

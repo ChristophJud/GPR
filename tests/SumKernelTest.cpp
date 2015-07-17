@@ -134,12 +134,48 @@ void Test1(){
     }
 }
 
+template<typename T>
+void Test2(){
+    /*
+     * Test 1.1: perform regression
+     * Test 1.2: save/load sum kernel
+     */
+    std::cout << "Test 2: parameter test with sum kernel... " << std::flush;
+
+    // typedefs
+    typedef GaussianKernel<T>                   GaussianKernelType;
+    typedef std::shared_ptr<GaussianKernelType>         GaussianKernelTypePointer;
+    typedef PeriodicKernel<T>                   PeriodicKernelType;
+    typedef std::shared_ptr<PeriodicKernelType>         PeriodicKernelTypePointer;
+    typedef SumKernel<T>                        SumKernelType;
+    typedef std::shared_ptr<SumKernelType>      SumKernelTypePointer;
+
+
+    PeriodicKernelTypePointer   pk(new PeriodicKernelType(0.59, 0.5, 0.4));
+    GaussianKernelTypePointer   gk(new GaussianKernelType(132, M_PI));
+    SumKernelTypePointer        sk(new SumKernelType(pk, gk));
+
+    SumKernelTypePointer sk2(new SumKernelType(PeriodicKernelTypePointer(new PeriodicKernelType(1, 1, 1)),
+                                               GaussianKernelTypePointer(new GaussianKernelType(1, 1))));
+
+    sk2->SetParameters(sk->GetParameters());
+
+    if((*sk) != (*sk2)){
+        std::cout << " [failed]." << std::endl;
+    }
+    else{
+        std::cout << " [passed]." << std::endl;
+    }
+
+}
 
 int main (int argc, char *argv[]){
     std::cout << "Sum kernel test: " << std::endl;
     try{
     Test1<float>();
     Test1<double>();
+    Test2<float>();
+    Test2<double>();
     }
     catch(std::string& s){
         std::cout << "Error: " << s << std::endl;
