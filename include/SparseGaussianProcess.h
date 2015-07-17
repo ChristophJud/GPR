@@ -46,6 +46,9 @@ public:
     SparseGaussianProcess(KernelTypePointer kernel) : Superclass(kernel),
                                                         m_Jitter(0),
                                                         m_Initialized(false){}
+    SparseGaussianProcess(KernelTypePointer kernel, TScalarType jitter) : Superclass(kernel),
+                                                        m_Jitter(jitter),
+                                                        m_Initialized(false){}
 
     // Destructor
     virtual ~SparseGaussianProcess(){}

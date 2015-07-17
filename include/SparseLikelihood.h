@@ -46,10 +46,6 @@ public:
     typedef GaussianProcess<TScalarType> GaussianProcessType;
     typedef typename GaussianProcess<TScalarType>::Pointer GaussianProcessTypePointer;
 
-    virtual inline VectorType operator()(const SparseGaussianProcessTypePointer gp) const{
-        throw std::string("Likelihood: operator() is not implemented.");
-    }
-
     virtual std::string ToString() const = 0;
 
     virtual void DebugOn(){
@@ -118,6 +114,7 @@ public:
     typedef typename Superclass::VectorType VectorType;
     typedef typename Superclass::MatrixType MatrixType;
     typedef typename Superclass::DiagMatrixType DiagMatrixType;
+    typedef typename Superclass::SparseGaussianProcessType SparseGaussianProcessType;
     typedef typename Superclass::SparseGaussianProcessTypePointer SparseGaussianProcessTypePointer;
     typedef typename Superclass::GaussianProcessTypePointer GaussianProcessTypePointer;
 
@@ -144,7 +141,9 @@ public:
         return det_B * A.diagonal().array().prod() * (B_inv + X.adjoint() * A_inv * X).determinant();
     }
 
-    virtual inline VectorType operator()(const SparseGaussianProcessTypePointer gp) const{
+    virtual inline VectorType operator()(const GaussianProcessTypePointer gp) const{
+        SparseGaussianProcessTypePointer sgp = CastToSparseGaussianProcess(gp);
+        if(sgp->GetNumberOfInducingSamples() == 0) throw std::string("SparseLikelihood::GetValueAndParameterDerivative: there are no inducing samples specified");
 
         // get all the important matrices
         MatrixType K;
@@ -152,28 +151,26 @@ public:
         MatrixType Knm;
         DiagMatrixType I_sigma;
 
-        this->GetCoreMatrices(gp, K, K_inv, Knm, I_sigma);
+        this->GetCoreMatrices(sgp, K, K_inv, Knm, I_sigma);
 
         MatrixType Y;
-        this->GetLabelMatrix(gp, Y);
+        this->GetLabelMatrix(sgp, Y);
 
         // data fit term
         MatrixType C_inv;
-        EfficientInversion(gp, C_inv, I_sigma, K_inv, K, Knm);
+        EfficientInversion(sgp, C_inv, I_sigma, K_inv, K, Knm);
         VectorType df = -0.5 * (Y.adjoint() * C_inv * Y);
 
 
         // complexity penalty (parameter regularizer)
         TScalarType determinant = this->EfficientDeterminant(I_sigma, K_inv, K, Knm);
-        if(determinant < -std::numeric_limits<double>::epsilon()){
-            std::stringstream ss;
-            ss << "SparseGaussianLogLikelihood: determinant of K is smaller than zero: " << determinant;
-            throw ss.str();
-        }
         TScalarType cp;
 
-        if(determinant <= 0){
+        if(determinant <= std::numeric_limits<double>::min()){
             cp = -0.5 * std::log(std::numeric_limits<double>::min());
+        }
+        else if(determinant > std::numeric_limits<double>::max()){
+            cp = -0.5 * std::log(std::numeric_limits<double>::max());
         }
         else{
             cp = -0.5 * std::log(determinant);
@@ -182,15 +179,15 @@ public:
 
         // inducing samples regularizer
         MatrixType C;
-        this->GetCoreMatrix(gp, C, K_inv, Knm);
+        this->GetCoreMatrix(sgp, C, K_inv, Knm);
 
-        TScalarType Knn_trace = this->GetKernelMatrixTrace(gp);
+        TScalarType Knn_trace = this->GetKernelMatrixTrace(sgp);
 
-        TScalarType sr = -0.5/gp->GetSigmaSquared() * (Knn_trace - C.trace());
+//        TScalarType sr = -0.5/gp->GetSigmaSquared() * (Knn_trace - C.trace());
 
 
         // constant term
-        TScalarType ct = -(gp->GetNumberOfSamples()/2.0) * std::log(2*M_PI);
+        TScalarType ct = -(sgp->GetNumberOfSamples()/2.0) * std::log(2*M_PI);
 
         if(this->debug){
             std::cout << "Knn trace: " << Knn_trace << std::endl;
@@ -198,13 +195,22 @@ public:
             std::cout << "Data fit: " << df << std::endl;
             std::cout << "Complexity: " << cp << std::endl;
             std::cout << "Constant: " << ct << std::endl;
-            std::cout << "Sample regularization: " << sr << std::endl;
+//            std::cout << "Sample regularization: " << sr << std::endl;
         }
 
-        return df.array() + (cp + ct + sr);
+//        return df.array() + (cp + ct + sr);
+
+        VectorType values = df.array() + (cp + ct);
+        if(std::isnan(values.sum())){
+            throw std::string("SparseLikelihood::GetValueAndParameterDerivative: likelihood value is not a number.");
+        }
+
+        return values;
     }
 
-    virtual inline VectorType GetParameterDerivatives(const SparseGaussianProcessTypePointer gp) const{
+    virtual inline VectorType GetParameterDerivatives(const GaussianProcessTypePointer gp) const{
+        SparseGaussianProcessTypePointer sgp = CastToSparseGaussianProcess(gp);
+        if(sgp->GetNumberOfInducingSamples() == 0) throw std::string("SparseLikelihood::GetValueAndParameterDerivative: there are no inducing samples specified");
 
         // get all the important matrices
         MatrixType K;
@@ -212,29 +218,29 @@ public:
         MatrixType Knm;
         DiagMatrixType I_sigma;
 
-        this->GetCoreMatrices(gp, K, K_inv, Knm, I_sigma);
+        this->GetCoreMatrices(sgp, K, K_inv, Knm, I_sigma);
 
         MatrixType Y;
-        this->GetLabelMatrix(gp, Y);
+        this->GetLabelMatrix(sgp, Y);
 
-        VectorType Knn_d_trace = this->GetDerivativeKernelMatrixTrace(gp);
+//        VectorType Knn_d_trace = this->GetDerivativeKernelMatrixTrace(gp);
 
 
         //----------------------------------------------------
         // data fit term
         MatrixType C_inv;
-        EfficientInversion(gp, C_inv, I_sigma, K_inv, K, Knm); // inv(I_sigma + Knm inv(Kmm) Kmn)
+        EfficientInversion(sgp, C_inv, I_sigma, K_inv, K, Knm); // inv(I_sigma + Knm inv(Kmm) Kmn)
 
         // compute: -0.5 Y' inv(C) grad(C) inv(C) Y
         MatrixType Kmm_d;
-        this->GetDerivativeKernelMatrix(gp, Kmm_d);
+        this->GetDerivativeKernelMatrix(sgp, Kmm_d);
 
         MatrixType Knm_d;
-        this->GetDerivativeKernelVectorMatrix(gp, Knm_d);
+        this->GetDerivativeKernelVectorMatrix(sgp, Knm_d);
 
-        unsigned num_params = gp->GetKernel()->GetNumberOfParameters();
-        unsigned n = gp->GetNumberOfSamples();
-        unsigned m = gp->GetNumberOfInducingSamples();
+        unsigned num_params = sgp->GetKernel()->GetNumberOfParameters();
+        unsigned n = sgp->GetNumberOfSamples();
+        unsigned m = sgp->GetNumberOfInducingSamples();
 
         MatrixType A; // grad(C)
         A.resize(num_params*n, n);
@@ -259,17 +265,21 @@ public:
             ct[p] = dTheta_i;
         }
 
-        //----------------------------------------------------
-        // sample regularization term
-        VectorType sr =  VectorType::Zero(num_params);
-        for(unsigned p=0; p<num_params; p++){
-            TScalarType dTheta_i = -0.5/gp->GetSigmaSquared() * (Knn_d_trace[p] - A.block(p*n, 0, n, n).trace());
-            sr[p] = dTheta_i;
-        }
-        return dt + ct + sr;
+//        //----------------------------------------------------
+//        // sample regularization term
+//        VectorType sr =  VectorType::Zero(num_params);
+//        for(unsigned p=0; p<num_params; p++){
+//            TScalarType dTheta_i = -0.5/gp->GetSigmaSquared() * (Knn_d_trace[p] - A.block(p*n, 0, n, n).trace());
+//            sr[p] = dTheta_i;
+//        }
+//        return dt + ct + sr;
+        return dt + ct;
     }
 
-    virtual inline std::pair<VectorType, VectorType> GetValueAndParameterDerivatives(const SparseGaussianProcessTypePointer gp) const{
+    virtual inline std::pair<VectorType, VectorType> GetValueAndParameterDerivatives(const GaussianProcessTypePointer gp) const{
+        SparseGaussianProcessTypePointer sgp = CastToSparseGaussianProcess(gp);
+        if(sgp->GetNumberOfInducingSamples() == 0) throw std::string("SparseLikelihood::GetValueAndParameterDerivative: there are no inducing samples specified");
+
         //------------------------------------
         // get all the important matrices
         MatrixType K;
@@ -277,7 +287,7 @@ public:
         MatrixType Knm;
         DiagMatrixType I_sigma;
 
-        this->GetCoreMatrices(gp, K, K_inv, Knm, I_sigma);
+        this->GetCoreMatrices(sgp, K, K_inv, Knm, I_sigma);
 
 
 //        std::cout << "Kernel matrix: " << std::endl;
@@ -286,12 +296,12 @@ public:
 //        std::cout << K_inv << std::endl;
 
         MatrixType Y;
-        this->GetLabelMatrix(gp, Y);
+        this->GetLabelMatrix(sgp, Y);
 
-        VectorType Knn_d_trace = this->GetDerivativeKernelMatrixTrace(gp);
+//        VectorType Knn_d_trace = this->GetDerivativeKernelMatrixTrace(gp);
 
         MatrixType C_inv;
-        EfficientInversion(gp, C_inv, I_sigma, K_inv, K, Knm); // inv(I_sigma + Knm inv(Kmm) Kmn)
+        EfficientInversion(sgp, C_inv, I_sigma, K_inv, K, Knm); // inv(I_sigma + Knm inv(Kmm) Kmn)
 
         //----------------------------------------------------
         // data fit term
@@ -300,14 +310,14 @@ public:
         // data fit gradient
         // compute: -0.5 Y' inv(C) grad(C) inv(C) Y
         MatrixType Kmm_d;
-        this->GetDerivativeKernelMatrix(gp, Kmm_d);
+        this->GetDerivativeKernelMatrix(sgp, Kmm_d);
 
         MatrixType Knm_d;
-        this->GetDerivativeKernelVectorMatrix(gp, Knm_d);
+        this->GetDerivativeKernelVectorMatrix(sgp, Knm_d);
 
-        unsigned num_params = gp->GetKernel()->GetNumberOfParameters();
-        unsigned n = gp->GetNumberOfSamples();
-        unsigned m = gp->GetNumberOfInducingSamples();
+        unsigned num_params = sgp->GetKernel()->GetNumberOfParameters();
+        unsigned n = sgp->GetNumberOfSamples();
+        unsigned m = sgp->GetNumberOfInducingSamples();
 
         MatrixType A; // grad(C)
         A.resize(num_params*n, n);
@@ -328,15 +338,13 @@ public:
         //----------------------------------------------------
         // complexity penalty (parameter regularizer)
         TScalarType determinant = this->EfficientDeterminant(I_sigma, K_inv, K, Knm);
-        if(determinant < -std::numeric_limits<double>::epsilon()){
-            std::stringstream ss;
-            ss << "SparseGaussianLogLikelihood: determinant of K is smaller than zero: " << determinant;
-            throw ss.str();
-        }
         TScalarType cp_value;
 
-        if(determinant <= 0){
+        if(determinant <= std::numeric_limits<double>::min() || std::isnan(determinant)){
             cp_value = -0.5 * std::log(std::numeric_limits<double>::min());
+        }
+        else if(determinant > std::numeric_limits<double>::max()){
+            cp_value = -0.5 * std::log(std::numeric_limits<double>::max());
         }
         else{
             cp_value = -0.5 * std::log(determinant);
@@ -352,34 +360,40 @@ public:
         //----------------------------------------------------
         // inducing sample regularization term
         MatrixType C;
-        this->GetCoreMatrix(gp, C, K_inv, Knm);
+        this->GetCoreMatrix(sgp, C, K_inv, Knm);
 
-        TScalarType Knn_trace = this->GetKernelMatrixTrace(gp);
+//        TScalarType Knn_trace = this->GetKernelMatrixTrace(gp);
 
-        TScalarType sr_value = -0.5/gp->GetSigmaSquared() * (Knn_trace - C.trace());
+//        TScalarType sr_value = -0.5/gp->GetSigmaSquared() * (Knn_trace - C.trace());
         //std::cout << "Knn_trace: " << Knn_trace << ", C.trace " << C.trace() << std::endl;
 
-        // inducing sample reg term derivative
-        VectorType sr_grad =  VectorType::Zero(num_params);
-        for(unsigned p=0; p<num_params; p++){
-            TScalarType dTheta_i = -0.5/gp->GetSigmaSquared() * (Knn_d_trace[p] - A.block(p*n, 0, n, n).trace());
-            sr_grad[p] = dTheta_i;
-        }
+//        // inducing sample reg term derivative
+//        VectorType sr_grad =  VectorType::Zero(num_params);
+//        for(unsigned p=0; p<num_params; p++){
+//            TScalarType dTheta_i = -0.5/gp->GetSigmaSquared() * (Knn_d_trace[p] - A.block(p*n, 0, n, n).trace());
+//            sr_grad[p] = dTheta_i;
+//        }
 
         //----------------------------------------------------
         // constant term
-        TScalarType ct_value = -(gp->GetNumberOfSamples()/2.0) * std::log(2*M_PI);
+        TScalarType ct_value = -(sgp->GetNumberOfSamples()/2.0) * std::log(2*M_PI);
 
 
         // full value
-        VectorType values = df_value.array() + (cp_value + ct_value + sr_value);
+//        VectorType values = df_value.array() + (cp_value + ct_value + sr_value);
+        VectorType values = df_value.array() + (cp_value + ct_value);
 
-        if(std::isinf(values[0])){
-            std::cout << "df: " << df_value << ", cp: " << cp_value << ", ct: " << ct_value << ", sr: " << sr_value << std::endl;
+//        if(std::isinf(values[0]) || std::isnan(values.sum())){
+//            std::cout << "df: " << df_value << ", cp: " << cp_value << ", ct: " << ct_value << ", det " << determinant << std::endl;
+//        }
+
+        if(std::isnan(values.sum())){
+            throw std::string("SparseLikelihood::GetValueAndParameterDerivative: likelihood value is not a number.");
         }
 
         // full gradient
-        VectorType derivatives = df_grad + cp_grad + sr_grad;
+//        VectorType derivatives = df_grad + cp_grad + sr_grad;
+        VectorType derivatives = df_grad + cp_grad;
 
         //std::cout << "df: " << df_grad.adjoint() << ", cp: " << cp_grad.adjoint() << ", " << sr_grad.adjoint() << std::endl;
 
@@ -392,6 +406,12 @@ public:
     virtual std::string ToString() const{ return "SparseGaussianLogLikelihood"; }
 
 private:
+    SparseGaussianProcessTypePointer CastToSparseGaussianProcess(const GaussianProcessTypePointer gp) const{
+        SparseGaussianProcessTypePointer sgp(std::dynamic_pointer_cast<SparseGaussianProcessType>(gp));
+        if(sgp.get()==NULL) throw std::string("SparseGaussianLogLikelihood: cannot cast to SparseGaussianProcess");
+        return sgp;
+    }
+
     SparseGaussianLogLikelihood(const Self&); //purposely not implemented
     void operator=(const Self&); //purposely not implemented
 };
