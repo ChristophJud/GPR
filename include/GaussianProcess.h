@@ -45,6 +45,8 @@ public:
 	typedef std::vector<VectorType> VectorListType;
 	typedef std::vector<MatrixType> MatrixListType;
 
+    typedef long double HighPrecisionType;
+
 
     /*
      * In the kernel regression method, the kernel matrix has to be inverted. There
@@ -221,7 +223,7 @@ protected:
      /*
       * Same as ComputeCoreMatrix but returns determinant of the kernel matrix
       */
-     TScalarType ComputeCoreMatrixWithDeterminant(MatrixType &C) const;
+     HighPrecisionType ComputeCoreMatrixWithDeterminant(MatrixType &C) const;
 
     /*
      * Inversion of the kernel matrix. TODO: should go into a base class

@@ -118,6 +118,8 @@ public:
     typedef typename Superclass::SparseGaussianProcessTypePointer SparseGaussianProcessTypePointer;
     typedef typename Superclass::GaussianProcessTypePointer GaussianProcessTypePointer;
 
+    typedef long double HighPrecisionType;
+
     // efficient matrix inversion of the form
     //  (A + XBX') = inv(A) - inv(A)X inv(inv(B)+X'inv(A)X) X' inv(A)
     // (here A is a diagonal)
@@ -131,14 +133,14 @@ public:
 
     // efficient determinant of the form
     // | A + XBX'| = |B|*|A|*|inv(B) + X' inv(A) X|
-    virtual inline TScalarType EfficientDeterminant(const DiagMatrixType& A, const MatrixType& B, const MatrixType& B_inv, const MatrixType &X) const{
+    virtual inline HighPrecisionType EfficientDeterminant(const DiagMatrixType& A, const MatrixType& B, const MatrixType& B_inv, const MatrixType &X) const{
         DiagMatrixType A_inv = (1.0/A.diagonal().array()).matrix().asDiagonal();
 
-        TScalarType det_B = B.determinant();
+        HighPrecisionType det_B = B.template cast<HighPrecisionType>().determinant();
         if(std::isinf(det_B)){
-            det_B = std::numeric_limits<TScalarType>::max();
+            det_B = std::numeric_limits<HighPrecisionType>::max();
         }
-        return det_B * A.diagonal().array().prod() * (B_inv + X.adjoint() * A_inv * X).determinant();
+        return det_B * A.diagonal().template cast<HighPrecisionType>().array().prod() * (B_inv + X.adjoint() * A_inv * X).template cast<HighPrecisionType>().determinant();
     }
 
     virtual inline VectorType operator()(const GaussianProcessTypePointer gp) const{
@@ -163,14 +165,14 @@ public:
 
 
         // complexity penalty (parameter regularizer)
-        TScalarType determinant = this->EfficientDeterminant(I_sigma, K_inv, K, Knm);
-        TScalarType cp;
+        HighPrecisionType determinant = this->EfficientDeterminant(I_sigma, K_inv, K, Knm);
+        HighPrecisionType cp;
 
-        if(determinant <= std::numeric_limits<double>::min()){
-            cp = -0.5 * std::log(std::numeric_limits<double>::min());
+        if(determinant <= std::numeric_limits<HighPrecisionType>::min()){
+            cp = -0.5 * std::log(std::numeric_limits<HighPrecisionType>::min());
         }
-        else if(determinant > std::numeric_limits<double>::max()){
-            cp = -0.5 * std::log(std::numeric_limits<double>::max());
+        else if(determinant > std::numeric_limits<HighPrecisionType>::max()){
+            cp = -0.5 * std::log(std::numeric_limits<HighPrecisionType>::max());
         }
         else{
             cp = -0.5 * std::log(determinant);
@@ -337,14 +339,14 @@ public:
 
         //----------------------------------------------------
         // complexity penalty (parameter regularizer)
-        TScalarType determinant = this->EfficientDeterminant(I_sigma, K_inv, K, Knm);
-        TScalarType cp_value;
+        HighPrecisionType determinant = this->EfficientDeterminant(I_sigma, K_inv, K, Knm);
+        HighPrecisionType cp_value;
 
-        if(determinant <= std::numeric_limits<double>::min() || std::isnan(determinant)){
-            cp_value = -0.5 * std::log(std::numeric_limits<double>::min());
+        if(determinant <= std::numeric_limits<HighPrecisionType>::min() || std::isnan(determinant)){
+            cp_value = -0.5 * std::log(std::numeric_limits<HighPrecisionType>::min());
         }
-        else if(determinant > std::numeric_limits<double>::max()){
-            cp_value = -0.5 * std::log(std::numeric_limits<double>::max());
+        else if(determinant > std::numeric_limits<HighPrecisionType>::max()){
+            cp_value = -0.5 * std::log(std::numeric_limits<HighPrecisionType>::max());
         }
         else{
             cp_value = -0.5 * std::log(determinant);

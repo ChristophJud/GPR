@@ -44,6 +44,8 @@ public:
     typedef typename GaussianProcessType::DiagMatrixType DiagMatrixType;
     typedef typename std::pair<VectorType,VectorType> ValueDerivativePair;
 
+    typedef long double HighPrecisionType;
+
     virtual inline VectorType operator()(const GaussianProcessTypePointer gp) const{
         throw std::string("Likelihood: operator() is not implemented.");
     }
@@ -94,13 +96,14 @@ public:
     typedef typename Superclass::VectorType VectorType;
     typedef typename Superclass::MatrixType MatrixType;
     typedef typename Superclass::GaussianProcessTypePointer GaussianProcessTypePointer;
+    typedef typename Superclass::HighPrecisionType HighPrecisionType;
 
     virtual inline VectorType operator()(const GaussianProcessTypePointer gp) const{
         MatrixType Y; // label matrix
         this->GetLabelMatrix(gp, Y);
 
         MatrixType C; // core matrix inv(K + sigmaI)
-        TScalarType determinant; // determinant of K + sigma I
+        HighPrecisionType determinant; // determinant of K + sigma I
         determinant = this->GetCoreMatrix(gp, C);
 
         // data fit
@@ -110,7 +113,7 @@ public:
         }
 
         // complexity penalty
-        if(determinant < -std::numeric_limits<double>::epsilon()){
+        if(determinant < -std::numeric_limits<HighPrecisionType>::epsilon()){
             std::stringstream ss;
             ss << "GaussianLikelihood: determinant of K is smaller than zero: " << determinant;
             throw ss.str();
@@ -118,7 +121,7 @@ public:
         TScalarType cp;
 
         if(determinant <= 0){
-            cp = 1.0/std::sqrt(std::numeric_limits<double>::min());
+            cp = 1.0/std::sqrt(std::numeric_limits<HighPrecisionType>::min());
         }
         else{
             cp = 1.0/std::sqrt(determinant);
@@ -152,26 +155,27 @@ public:
     typedef typename Superclass::MatrixType MatrixType;
     typedef typename Superclass::GaussianProcessTypePointer GaussianProcessTypePointer;
     typedef typename Superclass::ValueDerivativePair ValueDerivativePair;
+    typedef typename Superclass::HighPrecisionType HighPrecisionType;
 
     virtual inline VectorType operator()(const GaussianProcessTypePointer gp) const{
         MatrixType Y; // label matrix
         this->GetLabelMatrix(gp, Y);
 
         MatrixType C; // core matrix inv(K + sigmaI)
-        TScalarType determinant; // determinant of K + sigma I
+        HighPrecisionType determinant; // determinant of K + sigma I
         determinant = this->GetCoreMatrix(gp, C);
 
         // data fit
         VectorType df = -0.5 * (Y.adjoint() * C * Y);
 
         // complexity penalty
-        TScalarType cp;
+        HighPrecisionType cp;
 
-        if(determinant <= std::numeric_limits<double>::min()){
-            cp = -0.5 * std::log(std::numeric_limits<double>::min());
+        if(determinant <= std::numeric_limits<HighPrecisionType>::min()){
+            cp = -0.5 * std::log(std::numeric_limits<HighPrecisionType>::min());
         }
-        else if(determinant > std::numeric_limits<double>::max()){
-            cp = -0.5 * std::log(std::numeric_limits<double>::max());
+        else if(determinant > std::numeric_limits<HighPrecisionType>::max()){
+            cp = -0.5 * std::log(std::numeric_limits<HighPrecisionType>::max());
         }
         else{
             cp = -0.5 * std::log(determinant);
@@ -223,20 +227,20 @@ public:
         this->GetLabelMatrix(gp, Y);
 
         MatrixType C; // core matrix inv(K + sigmaI)
-        TScalarType determinant; // determinant of K + sigma I
+        HighPrecisionType determinant; // determinant of K + sigma I
         determinant = this->GetCoreMatrix(gp, C);
 
         // data fit
         VectorType df = -0.5 * (Y.adjoint() * C * Y);
 
         // complexity penalty
-        TScalarType cp;
+        HighPrecisionType cp;
 
-        if(determinant <= std::numeric_limits<double>::min()){
-            cp = -0.5 * std::log(std::numeric_limits<double>::min());
+        if(determinant <= std::numeric_limits<HighPrecisionType>::min()){
+            cp = -0.5 * std::log(std::numeric_limits<HighPrecisionType>::min());
         }
-        else if(determinant > std::numeric_limits<double>::max()){
-            cp = -0.5 * std::log(std::numeric_limits<double>::max());
+        else if(determinant > std::numeric_limits<HighPrecisionType>::max()){
+            cp = -0.5 * std::log(std::numeric_limits<HighPrecisionType>::max());
         }
         else{
             cp = -0.5 * std::log(determinant);

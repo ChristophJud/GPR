@@ -425,7 +425,7 @@ void Test4(){
     GaussianProcessInferenceTypePointer gpi(new GaussianProcessInferenceType(lh, gp, step, iterations));
 
     bool exp_output = true;
-    gpi->Optimize(false, exp_output);
+    gpi->Optimize(true, exp_output);
 
 
     std::cout << "print \"Parameters are: ";
@@ -458,7 +458,7 @@ void Test4(){
 //    else{
 //        std::cout << "[passed]" << std::endl;
 //    }
-//return;
+return;
 
     std::cout << "import numpy as np" << std::endl;
     std::cout << "import pylab as plt" << std::endl;

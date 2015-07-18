@@ -505,7 +505,8 @@ void GaussianProcess<TScalarType>::ComputeCoreMatrix(typename GaussianProcess<TS
 }
 
 template< class TScalarType >
-TScalarType GaussianProcess<TScalarType>::ComputeCoreMatrixWithDeterminant(typename GaussianProcess<TScalarType>::MatrixType &C) const{
+typename GaussianProcess<TScalarType>::HighPrecisionType GaussianProcess<TScalarType>::ComputeCoreMatrixWithDeterminant(typename GaussianProcess<TScalarType>::MatrixType &C) const{
+    typedef typename GaussianProcess<TScalarType>::HighPrecisionType HighPrecisionType;
     MatrixType K;
     ComputeKernelMatrix(K);
 
@@ -516,9 +517,9 @@ TScalarType GaussianProcess<TScalarType>::ComputeCoreMatrixWithDeterminant(typen
 
     if(debug){
         std::cout << "GaussianProcess::ComputeCoreMatrix: inversion error: " << (K*C - MatrixType::Identity(K.rows(),K.cols())).norm() << std::endl;
-        std::cout << "GaussianProcess::ComputeCoreMatrix: determinant of K: " << K.determinant() << std::endl;
+        std::cout << "GaussianProcess::ComputeCoreMatrix: determinant of K: " << K.template cast<HighPrecisionType>().determinant() << std::endl;
     }
-    return K.determinant();
+    return K.template cast<HighPrecisionType>().determinant();
 }
 
 template< class TScalarType >
