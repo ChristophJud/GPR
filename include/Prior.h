@@ -161,6 +161,122 @@ private:
     std::normal_distribution<TScalarType> normal_dist;
 };
 
+/*
+ * Gaussian Density: to evaluate the distribution at a point x
+ *
+ * p(x|mu,sigma) =
+ *
+ */
+template<class TScalarType>
+class LogGaussianDensity : public Density<TScalarType>{
+public:
+    LogGaussianDensity (TScalarType mu, TScalarType sigma) : mu(mu), sigma(sigma) {
+        if(sigma<=0) throw std::string("LogGaussianDensity : the LogGaussian density is only defined for sigma>0");
+        standard_normal = std::normal_distribution<TScalarType>(0, 1);
+    }
+    ~LogGaussianDensity (){}
+    TScalarType operator()(TScalarType x) const{
+        if(x<=0) throw std::string("LogGaussianDensity : domain error. x has to be greater than zero");
+        return 1.0/(x*sigma*std::sqrt(2*M_PI)) * std::exp(-(std::log(x)-mu)*(std::log(x)-mu)/(2*sigma*sigma));
+    }
+
+    TScalarType operator()() const{
+        return std::exp(mu + sigma * standard_normal(Density<TScalarType>::g));
+    }
+
+    TScalarType log(TScalarType x) const{
+        return std::log(this->operator()(x));
+    }
+
+    TScalarType GetDerivative(TScalarType x) const{
+        if(x<=0) throw std::string("LogGaussianDensity : domain error. x has to be greater than zero");
+        TScalarType logx = std::log(x);
+        TScalarType f = std::exp(-(logx*logx-2*m*logx+m*m)/(2*sigma*sigma));
+        return -(f*(logx+sigma*sigma-mu))/(std::sqrt(2)*std::sqrt(M_PI)*sigma*sigma*sigma*x*x);
+    }
+
+    TScalarType GetLogDerivative(TScalarType x) const{
+        if(x<=0) throw std::string("LogGaussianDensity : domain error. x has to be greater than zero");
+        return - (std::log(x) + sigma*sigma - mu)/(sigma*sigma*x);
+    }
+
+    TScalarType cdf(TScalarType x) const{
+        if(x<=0) throw std::string("LogGaussianDensity : domain error. x has to be greater than zero");
+        return 0.5 + 0.5*std::erf((std::log(x)-mu)/(std::sqrt(2)*sigma));
+    }
+
+    TScalarType mean() const{
+        return std::exp(mu+sigma*sigma/2);
+    }
+
+    TScalarType variance() const{
+        return (std::exp(sigma*sigma)-1)*std::exp(2*mu+sigma*sigma);
+    }
+
+    TScalarType mode() const{
+        return std::exp(mu-sigma*sigma);
+    }
+
+    std::string ToString() const{
+        return std::string("LogGaussianDensity");
+    }
+
+    static std::pair<TScalarType,TScalarType> GetMeanAndSigma(TScalarType mode, TScalarType variance){
+        // since one has to solve a non-linear equation to get the mean
+        // given the mode and variance, we perform Halley's method.
+        //
+        // Solve f(x) = 0
+        //
+        // xn+1 = xn - 2f(xn)f'(xn) / ( 2f'(xn)^2 - f(xn)*f''(xn) )
+        //
+        // as initial guess we use the value of the mode.
+
+        // mu = std::log(mean/(std::sqrt(1+var/(mean*mean))));
+        // sigma = std::sqrt(std::log(1+var/(mean*mean)));
+
+        // mode = std::exp();
+
+        // f: how to get mode given mean and variance (minus m to set f equal to zero)
+        auto f = [](TScalarType mu, TScalarType m, TScalarType v)->TScalarType {
+            return std::exp(mu) - m;
+        };
+
+        // df: first derivative of f with respect to mu
+        auto df = [](TScalarType mu, TScalarType m, TScalarType v)->TScalarType {
+            return std::sqrt(9*v*v/(4*mu*mu*mu*mu) +1) - 9*v*v/(mu*mu*std::sqrt(9*v*v+4*mu*mu*mu*mu)) + 3*v/(2*mu*mu);
+        };
+
+        // ddf: second derivative of f with respect to mu
+        auto ddf = [](TScalarType mu, TScalarType m, TScalarType v)->TScalarType {
+            return -(3*v*(std::pow(9*v*v+4*mu*mu*mu*mu,3.0/2) - 27*v*v*v - 36*mu*mu*mu*mu*v))/(mu*mu*mu*std::pow(9*v*v+4*mu*mu*mu*mu,3.0/2));
+        };
+
+        typedef std::function<TScalarType(TScalarType,TScalarType,TScalarType)> Function;
+        auto halley = [](TScalarType mu, TScalarType m, TScalarType v, Function f, Function df, Function ddf)->TScalarType {
+            return mu - (2*f(mu,m,v)*df(mu,m,v))/(2*std::pow(df(mu,m,v),2.0)-f(mu,m,v)*ddf(mu,m,v));
+        };
+
+        // Halley's method
+        TScalarType mu = mode*2; // initial value
+        TScalarType mu_old = mu;
+        for(unsigned i=0; i<100; i++){
+            mu = halley(mu,mode,variance, f, df , ddf);
+            if(std::abs(mu-mu_old)<1e-14){
+                break;
+            }
+            mu_old = mu;
+        }
+
+        return std::make_pair(mu, mu*mu*mu/variance);
+    }
+
+
+private:
+    TScalarType mu;
+    TScalarType sigma;
+    std::normal_distribution<TScalarType> standard_normal;
+};
+
 
 /*
  * Inverse Gaussian Density: to evaluate the distribution at a point x
