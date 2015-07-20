@@ -83,7 +83,7 @@ public:
         m_StepWidth3(stepwidth*stepwidth*stepwidth),
         m_NumberOfIterations(iterations){
 
-        m_Parameters.resize(m_GaussianProcess->GetKernel()->GetNumberOfParameters(), 1);
+        m_Parameters = m_GaussianProcess->GetKernel()->GetParameters(); //.resize(m_GaussianProcess->GetKernel()->GetNumberOfParameters(), 1);
     }
 
     ~GaussianProcessInference(){}

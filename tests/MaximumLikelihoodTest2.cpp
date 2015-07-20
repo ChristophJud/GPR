@@ -220,11 +220,154 @@ void Test2(){
 
 }
 
+void Test3(){
+    //std::cout << "Test 3: maximum likelihood of periodic signal ..." << std::flush;
+
+    // ground truth periodic variable
+    auto f = [](double x)->double { return std::sin(x)*std::cos(2.2*std::sin(x)); };
+
+    double start = 0;
+    double stop = 5 * 2*M_PI; // full interval
+    unsigned n = 350;
+
+    //--------------------------------------------------------------------------------
+    // generating ground truth
+    VectorType Xn = VectorType::Zero(n);
+    VectorType Yn = VectorType::Zero(n);
+    for(unsigned i=0; i<n; i++){
+        Xn[i] = start + i*(stop-start)/n;
+        Yn[i] = f(Xn[i]);
+    }
+
+    //--------------------------------------------------------------------------------
+    // perform training
+    double noise = 0.01;
+    static boost::minstd_rand randgen(static_cast<unsigned>(time(0)));
+    static boost::normal_distribution<> dist(0, noise);
+    static boost::variate_generator<boost::minstd_rand, boost::normal_distribution<> > r(randgen, dist);
+
+    double interval_training_end = 2 * 2*M_PI; // interval to train
+    unsigned number_of_samples = 200;
+
+
+    typedef gpr::PeriodicKernel<double>		KernelType;
+    typedef KernelType::Pointer KernelTypePointer;
+
+    KernelTypePointer k(new KernelType(1, 0.2, 2)); // scale, period, smoothness
+    GaussianProcessType::Pointer gp(new GaussianProcessType(k));
+    gp->SetSigma(noise); // noise
+
+    // add samples
+    double training_step_size = (interval_training_end - start) / number_of_samples;
+    for(unsigned i=0; i<number_of_samples; i++){
+        VectorType x(1);
+        x(0) = start + i*training_step_size;
+
+        VectorType y(1);
+        y(0) = f(x(0)) + r();
+
+        gp->AddSample(x, y);
+    }
+
+    //--------------------------------------------------------------------------------
+    // maximum likelihood
+    // setup likelihood
+    double step = 1e-1;
+    unsigned iterations = 200;
+
+    LikelihoodTypePointer lh(new LikelihoodType());
+    GaussianProcessInferenceTypePointer gpi(new GaussianProcessInferenceType(lh, gp, step, iterations));
+
+    bool exp_output = false;
+    gpi->Optimize(false, exp_output);
+
+
+    std::cout << "print \"Parameters are: ";
+    GaussianProcessInferenceType::ParameterVectorType parameters = gpi->GetParameters();
+    for(unsigned i=0; i<parameters.size(); i++){
+        if(exp_output) parameters[i] = std::exp(parameters[i]);
+        std::cout << parameters[i] << ", ";
+    }
+    std::cout << "\"" << std::endl;
+
+
+//    KernelTypePointer k(new KernelType(1,1,1));
+//    k->SetParameters(parameters);
+//    gp->SetKernel(k);
+
+
+
+    //--------------------------------------------------------------------------------
+    // predict full intervall
+    VectorType y_predict(n);
+    VectorType y(n);
+    for(unsigned i=0; i<n; i++){
+        VectorType x(1);
+        x(0) = Xn[i];
+        y(i) = Yn[i];
+        y_predict[i] = gp->Predict(x)(0);
+    }
+
+    double err = (y-y_predict).norm();
+    std::cout << "print \"" << err << "\""<< std::endl;
+//    if(err>0.4){
+//        std::cout << " [failed] with an error of " << err << std::endl;
+//    }
+//    else{
+//        std::cout << " [passed]." << std::endl;
+//    }
+
+    //return;
+    std::cout << "import numpy as np" << std::endl;
+    std::cout << "import pylab as plt" << std::endl;
+
+    // ground truth
+    //unsigned gt_n = 1000;
+    std::cout << "x = np.array([";
+    for(unsigned i=0; i<n; i++){
+        std::cout << Xn[i] << ", ";
+    }
+    std::cout << "])" << std::endl;
+    std::cout << "y = np.array([";
+    for(unsigned i=0; i<n; i++){
+        std::cout << f(Xn[i]) << ", ";
+    }
+    std::cout << "])" << std::endl;
+    std::cout << "plt.plot(x,y)" << std::endl;
+
+    // training
+    std::cout << "x_train = np.array([";
+    for(unsigned i=0; i<number_of_samples; i++){
+        std::cout << start + i*training_step_size << ", ";
+    }
+    std::cout << "])" << std::endl;
+    std::cout << "y_train = np.array([";
+    for(unsigned i=0; i<number_of_samples; i++){
+        std::cout << f(start + i*training_step_size ) + r()<< ", ";
+    }
+    std::cout << "])" << std::endl;
+    std::cout << "plt.plot(x_train, y_train, '.k')" << std::endl;
+
+    // dense prediction
+    double dense_error = 0;
+    std::cout << "gp_y = np.array([";
+    for(unsigned i=0; i<n; i++){
+        double p = gp->Predict(VectorType::Constant(1,Xn[i]))[0];
+        dense_error += std::fabs(p-f(Xn[i]));
+        std::cout << p << ", ";
+    }
+    std::cout << "])" << std::endl;
+    std::cout << "plt.plot(x, gp_y, '-r')" << std::endl;
+
+    std::cout << "plt.show()" << std::endl;
+}
+
 int main (int argc, char *argv[]){
-    std::cout << "Maximum likelihood test 2: " << std::endl;
+    //std::cout << "Maximum likelihood test 2: " << std::endl;
     try{
-        Test1();
-        Test2();
+        //Test1();
+        //Test2();
+        Test3();
     }
     catch(std::string& s){
         std::cout << "Error: " << s << std::endl;
