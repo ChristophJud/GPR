@@ -15,6 +15,8 @@
 #include "Likelihood.h"
 #include "SparseLikelihood.h"
 
+#include "GaussianProcessInference.h"
+
 /**
  * An SVD based implementation of the Moore-Penrose pseudo-inverse
  */
@@ -254,7 +256,7 @@ void Test3(){
     static boost::variate_generator<boost::minstd_rand, boost::normal_distribution<> > r(randgen, dist);
 
 
-    double h = 0.001;
+    double h = 0.0001;
     bool passed = true;
 
     for(unsigned iter=0; iter<10; iter++){
@@ -324,8 +326,10 @@ void Test3(){
 
             double d = (plus - minus)/h;
 
-            //std::cout <<  "central difference (sigma): " << d << ", but is " << D[0] <<   std::endl;
-            if(std::fabs(D[0] - d) > 1) passed = false;
+            if(std::fabs(D[0] - d) > 1){
+                passed = false;
+                std::cout <<  "central difference (sigma): " << d << ", but is " << D[0] <<   std::endl;
+            }
         }
         {
             // central differences scale
@@ -336,8 +340,10 @@ void Test3(){
 
             double d = (plus - minus)/h;
 
-            //std::cout <<  "central difference (scale): " << d << ", but is " << D[1] <<   std::endl;
-            if(std::fabs(D[1] - d) > 0.1) passed = false;
+            if(std::fabs(D[1] - d) > 0.1){
+                passed = false;
+                std::cout <<  "central difference (scale): " << d << ", but is " << D[1] <<   std::endl;
+            }
         }
     }
 
@@ -351,13 +357,157 @@ void Test3(){
     return;
 }
 
+
+void Test4(){
+    //std::cout << "Test 4: sparse maximum gaussian log likelihood with gradient descent test ..." << std::flush;
+    std::cout.precision(8);
+
+    typedef gpr::GaussianExpKernel<double>           GaussianExpKernelType;
+    typedef GaussianExpKernelType::Pointer           GaussianExpKernelTypePointer;
+    typedef gpr::GaussianKernel<double>              GaussianKernelType;
+    typedef GaussianKernelType::Pointer              GaussianKernelTypePointer;
+    typedef gpr::SparseGaussianLogLikelihood<double>       LikelihoodType;
+    typedef LikelihoodType::Pointer                  LikelihoodTypePointer;
+    typedef gpr::GaussianProcessInference<double>    GaussianProcessInferenceType;
+    typedef GaussianProcessInferenceType::Pointer    GaussianProcessInferenceTypePointer;
+
+    typedef gpr::GaussianProcess<double> GaussianProcessType;
+    typedef GaussianProcessType::VectorType VectorType;
+    typedef GaussianProcessType::MatrixType MatrixType;
+    typedef GaussianProcessType::DiagMatrixType DiagMatrixType;
+    typedef GaussianProcessType::VectorListType VectorListType;
+
+    // global parameters
+    unsigned n = 300;
+    unsigned m = 50;
+    double noise = 0.1;
+
+    // construct training data
+    auto f = [](double x)->double { return (0.5*std::sin(x+10*x) + std::sin(4*x))*x*x; };
+
+    static boost::minstd_rand randgen(static_cast<unsigned>(time(0)));
+    static boost::normal_distribution<> dist(0, noise);
+    static boost::variate_generator<boost::minstd_rand, boost::normal_distribution<> > r(randgen, dist);
+
+    double start = -5;
+    double stop = 10;
+    VectorType Xn = VectorType::Zero(n);
+    VectorType Yn = VectorType::Zero(n);
+    for(unsigned i=0; i<n; i++){
+        Xn[i] = start + i*(stop-start)/n;
+        Yn[i] = f(Xn[i])+r();
+    }
+
+
+    GaussianExpKernelTypePointer gk(new GaussianExpKernelType(1, 1));
+    SparseGaussianProcessType::Pointer gp(new SparseGaussianProcessType(gk, 0.11));
+    //gp->DebugOn();
+    gp->SetSigma(noise);
+    for(unsigned i=0; i<n; i++){
+        gp->AddSample(VectorType::Constant(1,Xn[i]), VectorType::Constant(1,Yn[i]));
+    }
+
+    std::vector<unsigned> indices;
+    for(unsigned i=0; i<n; i++){
+        indices.push_back(i);
+    }
+    std::random_shuffle(indices.begin(), indices.end());
+
+    for(unsigned i=0; i<m; i++){
+        gp->AddInducingSample(VectorType::Constant(1,Xn[indices[i]]), VectorType::Constant(1,Yn[indices[i]]));
+    }
+
+    // setup likelihood
+    double step = 1e-1;
+    unsigned iterations = 100;
+
+    LikelihoodTypePointer lh(new LikelihoodType());
+    GaussianProcessInferenceTypePointer gpi(new GaussianProcessInferenceType(lh, gp, step, iterations));
+
+    bool exp_output = true;
+    gpi->Optimize(true, exp_output);
+
+
+    std::cout << "print \"Parameters are: ";
+    GaussianProcessInferenceType::ParameterVectorType parameters = gpi->GetParameters();
+    for(unsigned i=0; i<parameters.size(); i++){
+        parameters[i] = std::exp(parameters[i]);
+        std::cout << parameters[i] << ", ";
+    }
+    std::cout << "\"" << std::endl;
+
+
+    GaussianKernelTypePointer k(new GaussianKernelType(1,1));
+    k->SetParameters(parameters);
+    gp->SetKernel(k);
+
+
+    // evaluate error
+    double error = 0;
+    unsigned gt_n = 1000;
+    for(unsigned i=0; i<gt_n; i++){
+        double x = start + i*(stop-start)/gt_n;
+        double p = gp->Predict(VectorType::Constant(1,x))[0];
+        error += std::fabs(p-f(x));
+    }
+
+
+//    if(error/gt_n > 2){
+//        std::cout << "[failed] with an avg error of " << error/gt_n << std::endl;
+//    }
+//    else{
+//        std::cout << "[passed]" << std::endl;
+//    }
+return;
+
+    std::cout << "import numpy as np" << std::endl;
+    std::cout << "import pylab as plt" << std::endl;
+
+    std::cout << "x = np.array([" << std::endl;
+    for(unsigned i=0; i<gt_n; i++){
+        std::cout << start + i*(stop-start)/gt_n << ", ";
+    }
+    std::cout << "])" << std::endl;
+
+    std::cout << "y = np.array([" << std::endl;
+    for(unsigned i=0; i<gt_n; i++){
+        std::cout << f(start + i*(stop-start)/gt_n) << ", ";
+    }
+    std::cout << "])" << std::endl;
+    std::cout << "plt.plot(x,y)" << std::endl;
+
+    std::cout << "xp = np.array([" << std::endl;
+    for(unsigned i=0; i<m; i++){
+        std::cout << Xn[indices[i]] << ", ";
+    }
+    std::cout << "])" << std::endl;
+
+    std::cout << "yp = np.array([" << std::endl;
+    for(unsigned i=0; i<m; i++){
+        std::cout << Yn[indices[i]] << ", ";
+    }
+    std::cout << "])" << std::endl;
+    std::cout << "plt.plot(xp,yp, '.k')" << std::endl;
+
+    std::cout << "Y = np.array([" << std::endl;
+    for(unsigned i=0; i<gt_n; i++){
+        std::cout << gp->Predict(VectorType::Constant(1,(start + i*(stop-start)/gt_n)))[0] << ", ";
+    }
+    std::cout << "])" << std::endl;
+    std::cout << "plt.plot(x,Y, '-r')" << std::endl;
+
+
+    std::cout << "plt.show()" << std::endl;
+}
+
 int main (int argc, char *argv[]){
     //std::cout << "Sparse Gaussian Process test: " << std::endl;
     try{
-        Test1();
-        Test2(0); // jitter 0
-        Test2(0.001); // jitter 0.001
-        Test3();
+//        Test1();
+//        Test2(0); // jitter 0
+//        Test2(0.001); // jitter 0.001
+//        Test3();
+        Test4();
     }
     catch(std::string& s){
         std::cout << "Error: " << s << std::endl;
