@@ -14,6 +14,7 @@ SET(gl2_lib_src MaximumLikelihoodTest2.cpp)
 SET(lp_lib_src LAPACKTest.cpp)
 SET(si_lib_src SparseInferenceTest.cpp)
 SET(mp_lib_src MaximumAPosterioriTest.cpp)
+SET(pt_lib_src PriorTest.cpp)
 
 
 ADD_EXECUTABLE(gpTest ${gp_lib_src})
@@ -32,6 +33,7 @@ ADD_EXECUTABLE(gl2Test ${gl2_lib_src})
 ADD_EXECUTABLE(lpTest ${lp_lib_src})
 ADD_EXECUTABLE(siTest ${si_lib_src})
 ADD_EXECUTABLE(mpTest ${mp_lib_src})
+ADD_EXECUTABLE(ptTest ${pt_lib_src})
 
 TARGET_LINK_LIBRARIES( gpTest gplib)
 TARGET_LINK_LIBRARIES( ioTest gplib)
@@ -49,6 +51,7 @@ TARGET_LINK_LIBRARIES( gl2Test gplib)
 TARGET_LINK_LIBRARIES( lpTest gplib)
 TARGET_LINK_LIBRARIES( siTest gplib)
 TARGET_LINK_LIBRARIES( mpTest gplib)
+TARGET_LINK_LIBRARIES( ptTest gplib)
 
 SET_TARGET_PROPERTIES(gpTest PROPERTIES OUTPUT_NAME gpTest)
 SET_TARGET_PROPERTIES(ioTest PROPERTIES OUTPUT_NAME ioTest)
@@ -66,6 +69,7 @@ SET_TARGET_PROPERTIES(gl2Test PROPERTIES OUTPUT_NAME gl2Test)
 SET_TARGET_PROPERTIES(lpTest PROPERTIES OUTPUT_NAME lpTest)
 SET_TARGET_PROPERTIES(siTest PROPERTIES OUTPUT_NAME siTest)
 SET_TARGET_PROPERTIES(mpTest PROPERTIES OUTPUT_NAME mpTest)
+SET_TARGET_PROPERTIES(ptTest PROPERTIES OUTPUT_NAME ptTest)
 
 INSTALL(TARGETS
 	gpTest
@@ -84,6 +88,7 @@ INSTALL(TARGETS
 	lpTest
 	siTest
 	mpTest
+	ptTest
 RUNTIME DESTINATION bin)
 
 INSTALL(FILES 

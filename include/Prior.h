@@ -27,7 +27,34 @@
 
 #include <boost/math/special_functions/gamma.hpp>
 
+#include <Eigen/Dense>
+#include <Eigen/SVD>
+
 namespace gpr {
+
+/**
+ * An SVD based implementation of the Moore-Penrose pseudo-inverse
+ */
+template<class TMatrixType>
+TMatrixType pinv(const TMatrixType& m, double epsilon = std::numeric_limits<double>::epsilon()) {
+    typedef Eigen::JacobiSVD<TMatrixType> SVD;
+    SVD svd(m, Eigen::ComputeFullU | Eigen::ComputeFullV);
+    typedef typename SVD::SingularValuesType SingularValuesType;
+    const SingularValuesType singVals = svd.singularValues();
+    SingularValuesType invSingVals = singVals;
+    for(int i=0; i<singVals.rows(); i++) {
+        if(singVals(i) <= epsilon) {
+            invSingVals(i) = 0.0; // FIXED can not be safely inverted
+        }
+        else {
+            invSingVals(i) = 1.0 / invSingVals(i);
+        }
+    }
+    return TMatrixType(svd.matrixV() *
+            invSingVals.asDiagonal() *
+            svd.matrixU().transpose());
+}
+
 
 template <typename T> int sgn(T val) {
     return (T(0) < val) - (val < T(0));
@@ -40,6 +67,8 @@ class Density{
 public:
 
     typedef std::pair<TScalarType, TScalarType> PairType;
+    typedef Eigen::Matrix<TScalarType, Eigen::Dynamic, 1> VectorType;
+    typedef Eigen::Matrix<TScalarType, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> MatrixType;
 
     virtual TScalarType operator()(TScalarType x) const = 0;
     Density(){}
@@ -170,18 +199,26 @@ private:
 template<class TScalarType>
 class LogGaussianDensity : public Density<TScalarType>{
 public:
-    LogGaussianDensity (TScalarType mu, TScalarType sigma) : mu(mu), sigma(sigma) {
-        if(sigma<=0) throw std::string("LogGaussianDensity : the LogGaussian density is only defined for sigma>0");
+
+    typedef Density<TScalarType> Superclass;
+    typedef LogGaussianDensity<TScalarType> Self;
+    typedef typename Superclass::VectorType VectorType;
+    typedef typename Superclass::MatrixType MatrixType;
+
+    typedef typename std::pair<TScalarType,TScalarType> ParameterPairType;
+
+    LogGaussianDensity (TScalarType mu, TScalarType sigma) : m_mu(mu), m_sigma(sigma) {
+        if(m_sigma<=0) throw std::string("LogGaussianDensity : the LogGaussian density is only defined for sigma>0");
         standard_normal = std::normal_distribution<TScalarType>(0, 1);
     }
     ~LogGaussianDensity (){}
     TScalarType operator()(TScalarType x) const{
         if(x<=0) throw std::string("LogGaussianDensity : domain error. x has to be greater than zero");
-        return 1.0/(x*sigma*std::sqrt(2*M_PI)) * std::exp(-(std::log(x)-mu)*(std::log(x)-mu)/(2*sigma*sigma));
+        return 1.0/(x*m_sigma*std::sqrt(2*M_PI)) * std::exp(-(std::log(x)-m_mu)*(std::log(x)-m_mu)/(2*m_sigma*m_sigma));
     }
 
     TScalarType operator()() const{
-        return std::exp(mu + sigma * standard_normal(Density<TScalarType>::g));
+        return std::exp(m_mu + m_sigma * standard_normal(Density<TScalarType>::g));
     }
 
     TScalarType log(TScalarType x) const{
@@ -191,37 +228,38 @@ public:
     TScalarType GetDerivative(TScalarType x) const{
         if(x<=0) throw std::string("LogGaussianDensity : domain error. x has to be greater than zero");
         TScalarType logx = std::log(x);
-        TScalarType f = std::exp(-(logx*logx-2*m*logx+m*m)/(2*sigma*sigma));
-        return -(f*(logx+sigma*sigma-mu))/(std::sqrt(2)*std::sqrt(M_PI)*sigma*sigma*sigma*x*x);
+        TScalarType f = std::exp(-(logx*logx-2*m_mu*logx+m_mu*m_mu)/(2*m_sigma*m_sigma));
+        return -(f*(logx+m_sigma*m_sigma-m_mu))/(std::sqrt(2)*std::sqrt(M_PI)*m_sigma*m_sigma*m_sigma*x*x);
     }
 
     TScalarType GetLogDerivative(TScalarType x) const{
         if(x<=0) throw std::string("LogGaussianDensity : domain error. x has to be greater than zero");
-        return - (std::log(x) + sigma*sigma - mu)/(sigma*sigma*x);
+        return - (std::log(x) + m_sigma*m_sigma - m_mu)/(m_sigma*m_sigma*x);
     }
 
     TScalarType cdf(TScalarType x) const{
         if(x<=0) throw std::string("LogGaussianDensity : domain error. x has to be greater than zero");
-        return 0.5 + 0.5*std::erf((std::log(x)-mu)/(std::sqrt(2)*sigma));
+        return 0.5 + 0.5*std::erf((std::log(x)-m_mu)/(std::sqrt(2)*m_sigma));
     }
 
     TScalarType mean() const{
-        return std::exp(mu+sigma*sigma/2);
+        return std::exp(m_mu+m_sigma*m_sigma/2);
     }
 
     TScalarType variance() const{
-        return (std::exp(sigma*sigma)-1)*std::exp(2*mu+sigma*sigma);
+        return (std::exp(m_sigma*m_sigma)-1)*std::exp(2*m_mu+m_sigma*m_sigma);
     }
 
     TScalarType mode() const{
-        return std::exp(mu-sigma*sigma);
+        return std::exp(m_mu-m_sigma*m_sigma);
     }
 
     std::string ToString() const{
         return std::string("LogGaussianDensity");
     }
 
-    static std::pair<TScalarType,TScalarType> GetMeanAndSigma(TScalarType mode, TScalarType variance){
+    // Attention: convergence is not stable for peaked mode
+    static ParameterPairType GetMuAndSigma(TScalarType mode, TScalarType variance){
         // since one has to solve a non-linear equation to get the mean
         // given the mode and variance, we perform Halley's method.
         //
@@ -231,49 +269,165 @@ public:
         //
         // as initial guess we use the value of the mode.
 
-        // mu = std::log(mean/(std::sqrt(1+var/(mean*mean))));
-        // sigma = std::sqrt(std::log(1+var/(mean*mean)));
-
-        // mode = std::exp();
-
-        // f: how to get mode given mean and variance (minus m to set f equal to zero)
-        auto f = [](TScalarType mu, TScalarType m, TScalarType v)->TScalarType {
-            return std::exp(mu) - m;
+        auto f1 = [](long double mu, long double s, long double m) -> long double {
+            return std::exp(mu-s*s) - m;
         };
 
-        // df: first derivative of f with respect to mu
-        auto df = [](TScalarType mu, TScalarType m, TScalarType v)->TScalarType {
-            return std::sqrt(9*v*v/(4*mu*mu*mu*mu) +1) - 9*v*v/(mu*mu*std::sqrt(9*v*v+4*mu*mu*mu*mu)) + 3*v/(2*mu*mu);
+        auto df1dmu = [](long double mu, long double s) -> long double {
+            return std::exp(mu-s*s);
         };
 
-        // ddf: second derivative of f with respect to mu
-        auto ddf = [](TScalarType mu, TScalarType m, TScalarType v)->TScalarType {
-            return -(3*v*(std::pow(9*v*v+4*mu*mu*mu*mu,3.0/2) - 27*v*v*v - 36*mu*mu*mu*mu*v))/(mu*mu*mu*std::pow(9*v*v+4*mu*mu*mu*mu,3.0/2));
+        auto df1ds = [](long double mu, long double s) -> long double {
+            return -2*s*std::exp(mu-s*s);
         };
 
-        typedef std::function<TScalarType(TScalarType,TScalarType,TScalarType)> Function;
-        auto halley = [](TScalarType mu, TScalarType m, TScalarType v, Function f, Function df, Function ddf)->TScalarType {
-            return mu - (2*f(mu,m,v)*df(mu,m,v))/(2*std::pow(df(mu,m,v),2.0)-f(mu,m,v)*ddf(mu,m,v));
+        auto ddf1dds = [](long double mu, long double s) -> long double {
+            return 2*(2*s*s-1)*std::exp(mu-s*s);
+        };
+
+        auto f2 = [](long double mu, long double s, long double v) -> long double {
+            return (std::exp(s*s)-1)*std::exp(2*mu+s*s) - v;
+        };
+
+        auto df2dmu = [](long double mu, long double s) -> long double {
+            return 2*(std::exp(s*s)-1)*std::exp(2*mu+s*s);
+        };
+
+        auto df2ds = [](long double mu, long double s) -> long double {
+            return 2*s*(2*std::exp(s*s)-1)*std::exp(2*mu+s*s);
+        };
+
+        auto ddf2ddmu = [](long double mu, long double s) -> long double {
+            return 4*(std::exp(s*s)-1)*std::exp(2*mu+s*s);
+        };
+
+        auto ddf2dds = [](long double mu, long double s) -> long double {
+            return 2*((8*s*s+2)*std::exp(s*s)-2*s*s-1)*std::exp(s*s+2*mu);
+        };
+
+        auto ddf2dmuds = [](long double mu, long double s) -> long double {
+            return 4*s*(2*std::exp(s*s)-1)*std::exp(s*s+2*mu);
+        };
+
+
+        auto halley = [&f1, &f2, &df1dmu, &df1ds, &df2dmu, &df2ds, &ddf1dds, &ddf2dds, &ddf2ddmu, &ddf2dmuds]
+                (long double mu, long double s, long double m, long double v)->VectorType {
+
+            typedef Eigen::Matrix<long double, Eigen::Dynamic, 1> VectorType;
+            typedef Eigen::Matrix<long double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> MatrixType;
+
+            // a = 0.5 -> Halley's method
+            // a = -inf -> Newton method
+            TScalarType alpha = 0.5;
+
+            VectorType F = VectorType::Zero(2);
+            F(0) = f1(mu,s,m);
+            F(1) = f2(mu,s,v);
+
+            MatrixType J = MatrixType::Zero(2,2);
+            J(0,0) = df1dmu(mu,s);
+            J(0,1) = df2dmu(mu,s);
+            J(1,0) = df1ds(mu,s);
+            J(1,1) = df2ds(mu,s);
+
+            MatrixType H = MatrixType::Zero(2,4);
+            H(0,0) = J(0,0);
+            H(0,1) = J(0,1);
+            H(0,2) = ddf2ddmu(mu,s);
+            H(0,3) = ddf2dmuds(mu,s);
+            H(1,0) = H(0,1);
+            H(1,1) = ddf1dds(mu,s);
+            H(1,2) = H(0,3);
+            H(1,3) = ddf2dds(mu,s);
+
+            VectorType nc = -pinv<MatrixType>(J)*F; // Newton correction
+            MatrixType A = MatrixType::Zero(2,2);
+            A.row(0) = (H.leftCols(2)*nc).adjoint();
+            A.row(1) = (H.rightCols(2)*nc).adjoint();
+
+            VectorType convexity = -0.5*pinv<MatrixType>(J+alpha*A)*A*nc;
+            VectorType hc = nc+convexity; // Halley correction
+
+            VectorType u = VectorType::Zero(2);
+            u[0] = mu+hc[0];
+            u[1] = s+hc[1];
+
+            return u.cast<TScalarType>();
         };
 
         // Halley's method
-        TScalarType mu = mode*2; // initial value
-        TScalarType mu_old = mu;
+
+        bool cout = false;
+
+        // initial guess of mu=p(0) and sigma=p(1)
+        // iterative
+        VectorType p = VectorType::Zero(2);
+        p(1) = 0; // initial value
+
+        TScalarType average = 0;
+        unsigned cnt = 0;
+        for(unsigned i=0; i<20; i++){
+            if(cout) std::cout << p(1) << std::endl;
+            p(1) = std::sqrt(std::log(1+variance/std::exp(std::log(mode)+3/2.0*p(1)*p(1))));
+
+            if(i>10){
+                average += p(1);
+                cnt++;
+            }
+        }
+        if(cnt>0){
+            p(1) = average/cnt;
+        }
+        if(cout) std::cout << "final sigma " << p(1) << std::endl;
+
+        TScalarType mean = std::exp(std::log(mode)+3/2.0*p(1)*p(1));
+
+        if(cout) std::cout << "mean " << mean << std::endl;
+
+        //p(0) = std::log(mean/std::sqrt(1+variance/(mean*mean)));
+        p(0) = std::log(mode)+p(1)*p(1);
+
+        if(cout){
+            std::cout << "mu " << p(0) << std::endl;
+            std::cout << "initial guess: mu/sigma " << p.adjoint() << std::endl;
+
+            Self density(p(0), p(1));
+            std::cout << "mu/sigma: " << p.adjoint() << ", \t mode/variance: " << density.mode() << " " << density.variance() << std::endl;
+        }
+        VectorType p_old = p;
         for(unsigned i=0; i<100; i++){
-            mu = halley(mu,mode,variance, f, df , ddf);
-            if(std::abs(mu-mu_old)<1e-14){
+            p = halley(p(0), p(1), mode, variance);
+            if(cout){
+                Self density(p(0), p(1));
+                std::cout << "mu/sigma: " << p.adjoint() << ", \t mode/variance: " << density.mode() << " " << density.variance() << std::endl;
+            }
+            if((p-p_old).norm()<1e-14){
                 break;
             }
-            mu_old = mu;
+            p_old = p;
         }
 
-        return std::make_pair(mu, mu*mu*mu/variance);
+        TScalarType mu = p(0);
+        TScalarType s = p(1);
+        TScalarType err_mode = std::fabs(std::exp(mu-s*s) - mode);
+        TScalarType err_variance = std::fabs((std::exp(s*s)-1)*std::exp(2*mu+s*s)-variance);
+        if(err_mode > 1e-10 || err_variance > 1e-10){
+            std::stringstream ss;
+            ss << "LogGaussianDensity::GetMuAndSigma: cannot determ mu and sigma for mode=" << mode << " and variance=" << variance;
+            ss << ". Errors: mode " << err_mode << ", variance " << err_variance;
+            throw ss.str();
+        }
+
+        if(std::isnan(mu) || std::isnan(s)){
+            throw std::string("LogGaussianDensity::GetMuAndSigma: result is nan");
+        }
+        return std::make_pair(mu, std::fabs(s));
     }
 
 
 private:
-    TScalarType mu;
-    TScalarType sigma;
+    TScalarType m_mu;
+    TScalarType m_sigma;
     std::normal_distribution<TScalarType> standard_normal;
 };
 
@@ -287,6 +441,10 @@ private:
 template<class TScalarType>
 class InverseGaussianDensity : public Density<TScalarType>{
 public:
+    typedef Density<TScalarType> Superclass;
+    typedef InverseGaussianDensity<TScalarType> Self;
+    typedef std::pair<TScalarType,TScalarType> ParameterPairType;
+
     InverseGaussianDensity(TScalarType lambda, TScalarType mu) : lambda(lambda), mu(mu) {
         if(lambda<=0 || mu<=0) throw std::string("InverseGaussianDensity: the inverse Gaussian density is only defined for lambda>0 and mu>0");
         normal_dist = std::normal_distribution<TScalarType>(0, 1);
@@ -315,8 +473,18 @@ public:
         }
     }
 
+    TScalarType GetDerivative(TScalarType x) const{
+        TScalarType numerator = -lambda*(lambda*x*x+3*mu*mu*x-lambda*mu*mu)*std::exp(-(lambda*x*x-2*lambda*mu*x+lambda*mu*mu)/(2*mu*mu*x));
+        TScalarType denumerator = std::sqrt(6)*std::sqrt(M_PI)*mu*mu*std::sqrt(lambda/(x*x*x))*x*x*x*x*x;
+        return numerator/denumerator;
+    }
+
+    TScalarType GetLogDerivative(TScalarType x) const{
+        return -3/(2*x)+lambda/(2*x*x)-lambda/(2*mu*mu);
+    }
+
     // log probability of x given lambda and mu
-    TScalarType log(TScalarType x) const{
+    TScalarType logDensity(TScalarType x) const{
         if(x<=1) throw std::string("InverseGaussianDensity::log: domain error. The log of the InverseGaussian is only defined for x>1.");
         TScalarType logx;
         if(x<std::numeric_limits<TScalarType>::epsilon()){
@@ -343,6 +511,10 @@ public:
 
 
         return std::abs(1.0/x) * root_value * exp_value;
+    }
+
+    TScalarType log(TScalarType x) const{
+        return std::log(this->operator()(x));
     }
 
 
@@ -372,7 +544,7 @@ public:
         return std::string("InverseGaussianDensity");
     }
 
-    static std::pair<TScalarType,TScalarType> GetMeanAndLambda(TScalarType mode, TScalarType variance){
+    static ParameterPairType GetMeanAndLambda(TScalarType mode, TScalarType variance){
         // since one has to solve a non-linear equation to get the mean
         // given the mode and variance, we perform Halley's method.
         //
@@ -406,7 +578,9 @@ public:
         // Halley's method
         TScalarType mu = mode*2; // initial value
         TScalarType mu_old = mu;
+        std::cout << "iteration" << std::endl;
         for(unsigned i=0; i<100; i++){
+            std::cout << mu << std::endl;
             mu = halley(mu,mode,variance, f, df , ddf);
             if(std::abs(mu-mu_old)<1e-14){
                 break;
@@ -414,6 +588,14 @@ public:
             mu_old = mu;
         }
 
+        Self p(mu, mu*mu*mu/variance);
+        std::cout << "mode " << mode << ", estimation " << p.mode() << std::endl;
+        std::cout << "variance " << variance << ", estimation " << p.variance() << std::endl;
+        if(std::fabs(p.mode() - mode)>1e-14){
+            std::stringstream ss;
+            ss << "InverseGaussianDensity::GetMeanAndLambda: cannot determ mean and lambda for mode=" << mode << " and variance=" << variance;
+            throw ss.str();
+        }
         return std::make_pair(mu, mu*mu*mu/variance);
     }
 

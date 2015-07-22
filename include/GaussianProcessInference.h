@@ -31,32 +31,10 @@
 #include "SparseGaussianProcess.h"
 
 #include "Likelihood.h"
+#include "Prior.h"
 #include "SparseLikelihood.h"
 
 namespace gpr{
-
-/**
- * An SVD based implementation of the Moore-Penrose pseudo-inverse
- */
-template<class TMatrixType>
-TMatrixType pinv(const TMatrixType& m, double epsilon = std::numeric_limits<double>::epsilon()) {
-    typedef Eigen::JacobiSVD<TMatrixType> SVD;
-    SVD svd(m, Eigen::ComputeFullU | Eigen::ComputeFullV);
-    typedef typename SVD::SingularValuesType SingularValuesType;
-    const SingularValuesType singVals = svd.singularValues();
-    SingularValuesType invSingVals = singVals;
-    for(int i=0; i<singVals.rows(); i++) {
-        if(singVals(i) <= epsilon) {
-            invSingVals(i) = 0.0; // FIXED can not be safely inverted
-        }
-        else {
-            invSingVals(i) = 1.0 / invSingVals(i);
-        }
-    }
-    return TMatrixType(svd.matrixV() *
-            invSingVals.asDiagonal() *
-            svd.matrixU().transpose());
-}
 
 template<class TScalarType>
 class GaussianProcessInference{
