@@ -448,16 +448,18 @@ public:
     enum OptMethod{Bisection=0,Halley=1};
 
     InverseGaussianDensity(TScalarType lambda, TScalarType mu) : lambda(lambda), mu(mu) {
-        if(lambda<=0 || mu<=0) throw std::string("InverseGaussianDensity: the inverse Gaussian density is only defined for lambda>0 and mu>0");
+        if(lambda<=TScalarType(0) || mu<=TScalarType(0)) throw std::string("InverseGaussianDensity: the inverse Gaussian density is only defined for lambda>0 and mu>0");
         normal_dist = std::normal_distribution<TScalarType>(0, 1);
         uniform_dist = std::uniform_real_distribution<TScalarType>(0, 1);
     }
+
+    InverseGaussianDensity(const ParameterPairType& params) : InverseGaussianDensity(params.first, params.second) {}
+
     ~InverseGaussianDensity(){}
 
     // Probability of x given lambda and mu
     TScalarType operator()(TScalarType x) const{
-        if(x<=0) throw std::string("InverseGaussianDensity: domain error. The inverse Gaussian density is not defined for x<=0.");
-
+        if(x<=TScalarType(0)) throw std::string("InverseGaussianDensity: domain error. The inverse Gaussian density is not defined for x<=0.");
         return std::sqrt(lambda/(2*M_PI*x*x*x)) * std::exp(-lambda*(x-mu)*(x-mu)/(2*mu*mu*x));
     }
 
@@ -508,15 +510,11 @@ public:
         TScalarType exp_value = std::exp(-lambda*(logx-mu)*(logx-mu)/(2*mu*mu*logx));
         if(exp_value==0) exp_value = std::numeric_limits<TScalarType>::epsilon();
 
-        //std::cout << x << ", " << std::abs(1.0/x) << ", " << root_value << ", " << exp_value << ", " << std::abs(1.0/x) * root_value * exp_value << std::endl;
-
-
-
         return std::abs(1.0/x) * root_value * exp_value;
     }
 
     TScalarType log(TScalarType x) const{
-        return std::log(this->operator()(x));
+        return std::log((*this)(x));
     }
 
 
@@ -547,12 +545,19 @@ public:
     }
 
     static ParameterPairType GetMeanAndLambda(TScalarType mode, TScalarType variance, OptMethod m=OptMethod::Halley){
+        ParameterPairType lambda_mu;
         switch(m){
         case OptMethod::Bisection:
-            return GetMeanAndLambdaBisection(mode, variance);
+            lambda_mu = GetMeanAndLambdaBisection(mode, variance);
         case OptMethod::Halley:
-            return GetMeanAndLambdaHalley(mode, variance);
+            lambda_mu = GetMeanAndLambdaHalley(mode, variance);
         }
+
+        if(lambda_mu.first <=0 || lambda_mu.second <=0){
+            throw std::string("InverseGaussianDensity::GetMeanAndLambda: mu and lambd must be strict positive");
+        }
+
+        return lambda_mu;
     }
 
 private:
@@ -603,7 +608,7 @@ private:
         }
 
         Self p(mu*mu*mu/variance, mu);
-        if(std::fabs(p.mode() - mode)>1e-14){
+        if(std::fabs(p.mode() - mode)>1e-14 || std::isnan(mu) || std::isinf(mu)){
             std::stringstream ss;
             ss << "InverseGaussianDensity::GetMeanAndLambda: cannot determ mean and lambda for mode=" << mode << " and variance=" << variance;
             throw ss.str();
@@ -648,7 +653,7 @@ private:
         }
 
         Self p(mu*mu*mu/variance, mu);
-        if(std::fabs(p.mode() - mode)>1e-10){
+        if(std::fabs(p.mode() - mode)>1e-10 || std::isnan(mu) || std::isinf(mu)){
             std::stringstream ss;
             ss << "InverseGaussianDensity::GetMeanAndLambda: cannot determ mean and lambda for mode=" << mode << " and variance=" << variance;
             throw ss.str();

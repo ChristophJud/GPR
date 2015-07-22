@@ -22,12 +22,24 @@ extern "C" {
 
     // inversion of a symmetric positive definit matrix using its cholesky decomposition
     void dpotri_(char *UPLO, int *N, double *A, int *LDA, int *INFO);
+
+    int ilaenv_(int* ispec, char* name, char* opts, int* n1, int* n2, int* n3, int* n4);
+}
+
+int get_optimal_block_size(int N){
+    int ispec = 1;
+    int n = -1;
+    char name[] = "DGETRI";
+    char space[] = " ";
+
+    return ilaenv_(&ispec, name, space, &N, &n, &n, &n);
 }
 
 void lu_inversion(double* A, int N)
 {
     int *IPIV = new int[N];
-    int LWORK = N*N;
+    //int LWORK = N*N;
+    int LWORK = N*get_optimal_block_size(N);
     double *WORK = new double[LWORK];
     int INFO;
 
