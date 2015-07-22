@@ -445,6 +445,8 @@ public:
     typedef InverseGaussianDensity<TScalarType> Self;
     typedef std::pair<TScalarType,TScalarType> ParameterPairType;
 
+    enum OptMethod{Bisection=0,Halley=1};
+
     InverseGaussianDensity(TScalarType lambda, TScalarType mu) : lambda(lambda), mu(mu) {
         if(lambda<=0 || mu<=0) throw std::string("InverseGaussianDensity: the inverse Gaussian density is only defined for lambda>0 and mu>0");
         normal_dist = std::normal_distribution<TScalarType>(0, 1);
@@ -544,7 +546,17 @@ public:
         return std::string("InverseGaussianDensity");
     }
 
-    static ParameterPairType GetMeanAndLambda(TScalarType mode, TScalarType variance){
+    static ParameterPairType GetMeanAndLambda(TScalarType mode, TScalarType variance, OptMethod m=OptMethod::Halley){
+        switch(m){
+        case OptMethod::Bisection:
+            return GetMeanAndLambdaBisection(mode, variance);
+        case OptMethod::Halley:
+            return GetMeanAndLambdaHalley(mode, variance);
+        }
+    }
+
+private:
+    static ParameterPairType GetMeanAndLambdaHalley(TScalarType mode, TScalarType variance){
         // since one has to solve a non-linear equation to get the mean
         // given the mode and variance, we perform Halley's method.
         //
@@ -557,30 +569,32 @@ public:
 
         // f: how to get mode given mean and variance (minus m to set f equal to zero)
         auto f = [](TScalarType mu, TScalarType m, TScalarType v)->TScalarType {
-            return mu*std::sqrt(9*v*v/(4*mu*mu*mu*mu) +1) -3*v/(2*mu) - m;
+            return (std::sqrt(4*mu*mu*mu*mu+9*v*v)-2*m*mu-3*v)/(2*mu);
         };
 
         // df: first derivative of f with respect to mu
-        auto df = [](TScalarType mu, TScalarType m, TScalarType v)->TScalarType {
-            return std::sqrt(9*v*v/(4*mu*mu*mu*mu) +1) - 9*v*v/(mu*mu*std::sqrt(9*v*v+4*mu*mu*mu*mu)) + 3*v/(2*mu*mu);
+        auto df = [](TScalarType mu, TScalarType v)->TScalarType {
+            TScalarType r = std::sqrt(4*mu*mu*mu*mu+9*v*v);
+            return (3*v*(r-3*v)+4*mu*mu*mu*mu)/(2*mu*mu*r);
         };
 
         // ddf: second derivative of f with respect to mu
-        auto ddf = [](TScalarType mu, TScalarType m, TScalarType v)->TScalarType {
-            return -(3*v*(std::pow(9*v*v+4*mu*mu*mu*mu,3.0/2) - 27*v*v*v - 36*mu*mu*mu*mu*v))/(mu*mu*mu*std::pow(9*v*v+4*mu*mu*mu*mu,3.0/2));
+        auto ddf = [](TScalarType mu, TScalarType v)->TScalarType {
+            TScalarType a = 4*mu*mu*mu*mu+9*v*v;
+            TScalarType r = std::sqrt(a*a*a);
+            return -(3*v*(r-36*v*mu*mu*mu*mu-27*v*v*v))/(mu*mu*mu*r);
         };
 
         typedef std::function<TScalarType(TScalarType,TScalarType,TScalarType)> Function;
-        auto halley = [](TScalarType mu, TScalarType m, TScalarType v, Function f, Function df, Function ddf)->TScalarType {
-            return mu - (2*f(mu,m,v)*df(mu,m,v))/(2*std::pow(df(mu,m,v),2.0)-f(mu,m,v)*ddf(mu,m,v));
+        typedef std::function<TScalarType(TScalarType,TScalarType)> DerivativeFunction;
+        auto halley = [](TScalarType mu, TScalarType m, TScalarType v, Function f, DerivativeFunction df, DerivativeFunction ddf)->TScalarType {
+            return mu - (2*f(mu,m,v)*df(mu,v))/(2*std::pow(df(mu,v),2.0)-f(mu,m,v)*ddf(mu,v));
         };
 
         // Halley's method
-        TScalarType mu = mode*2; // initial value
+        TScalarType mu = 1.6; // initial value
         TScalarType mu_old = mu;
-        std::cout << "iteration" << std::endl;
         for(unsigned i=0; i<100; i++){
-            std::cout << mu << std::endl;
             mu = halley(mu,mode,variance, f, df , ddf);
             if(std::abs(mu-mu_old)<1e-14){
                 break;
@@ -588,18 +602,60 @@ public:
             mu_old = mu;
         }
 
-        Self p(mu, mu*mu*mu/variance);
-        std::cout << "mode " << mode << ", estimation " << p.mode() << std::endl;
-        std::cout << "variance " << variance << ", estimation " << p.variance() << std::endl;
+        Self p(mu*mu*mu/variance, mu);
         if(std::fabs(p.mode() - mode)>1e-14){
             std::stringstream ss;
             ss << "InverseGaussianDensity::GetMeanAndLambda: cannot determ mean and lambda for mode=" << mode << " and variance=" << variance;
             throw ss.str();
         }
-        return std::make_pair(mu, mu*mu*mu/variance);
+        return std::make_pair(mu*mu*mu/variance, mu);
     }
 
-private:
+    static ParameterPairType GetMeanAndLambdaBisection(TScalarType mode, TScalarType variance){
+        // f: how to get mode given mean and variance (minus m to set f equal to zero)
+        auto f = [](TScalarType mu, TScalarType m, TScalarType v)->TScalarType {
+            return (std::sqrt(4*mu*mu*mu*mu+9*v*v)-2*m*mu-3*v)/(2*mu);
+        };
+
+        TScalarType a = 1e-16;
+        TScalarType b = 1e8;
+        TScalarType u = 0;
+
+        TScalarType mu = 0;
+
+        for(unsigned i=0; i<1000; i++){
+            // Calculate c, the midpoint of the interval, c = 0.5 * (a + b)
+            TScalarType c = 0.5 * (a+b);
+
+            // Calculate the function value at the midpoint, f(c)
+            TScalarType fc = f(c, mode, variance)-u;
+
+            // If convergence is satisfactory (that is, a - c is sufficiently small,
+            // or f(c) is sufficiently small), return c and stop iterating
+            if(std::abs(a-c)<1e-14){ // || std::abs(f)<1e-14){
+                mu = c;
+                break;
+            }
+
+            // Examine the sign of f(c) and replace either (a, f(a)) or (b, f(b)) with (c, f(c))
+            // so that there is a zero crossing within the new interval
+            if(sgn(f(a, mode, variance)-u) != sgn(fc)){
+                b = c;
+            }
+            if(sgn(f(b, mode, variance)-u) != sgn(fc)){
+                a = c;
+            }
+        }
+
+        Self p(mu*mu*mu/variance, mu);
+        if(std::fabs(p.mode() - mode)>1e-10){
+            std::stringstream ss;
+            ss << "InverseGaussianDensity::GetMeanAndLambda: cannot determ mean and lambda for mode=" << mode << " and variance=" << variance;
+            throw ss.str();
+        }
+        return std::make_pair( mu*mu*mu/variance, mu);
+    }
+
     TScalarType lambda;
     TScalarType mu;
     std::normal_distribution<TScalarType> normal_dist;

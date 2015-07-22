@@ -50,34 +50,40 @@ void Test1(){
     }
 }
 
-void Test2(){
+void Test2(bool bisection){
     /*
      * Test 2: Inverse Gaussian Density
      */
-     std::cout << "Test 2.1: Inverse Gaussian density parameter estimation...\t\t" << std::flush;
+    if(bisection){
+        std::cout << "Test 2.1: Inverse Gaussian density parameter estimation (Bisection method)...\t\t" << std::flush;
+    }
+    else{
+        std::cout << "Test 2.1: Inverse Gaussian density parameter estimation (Halley method)...\t\t" << std::flush;
+    }
 
-     typedef InverseGaussianDensity<double> InverseGaussianDensityType;
+     typedef InverseGaussianDensity<long double> InverseGaussianDensityType;
 
-     for(double mode=1; mode<5; mode+=0.05){
-         double variance = mode/2;
-         InverseGaussianDensityType::ParameterPairType mu_lambda = InverseGaussianDensityType::GetMeanAndLambda(mode, variance);
-         InverseGaussianDensityType* p = new InverseGaussianDensityType(mu_lambda.first, mu_lambda.second);
+     for(double mode=0.05; mode<5; mode+=0.05){
+         for(double variance=0.01; variance<2; variance+=0.01){
+             InverseGaussianDensityType::ParameterPairType lambda_mu;
+             if(bisection){
+                 lambda_mu = InverseGaussianDensityType::GetMeanAndLambda(mode, variance, InverseGaussianDensityType::Bisection);
+             }
+             else{
+                 lambda_mu = InverseGaussianDensityType::GetMeanAndLambda(mode, variance, InverseGaussianDensityType::Halley);
+             }
+             InverseGaussianDensityType* p = new InverseGaussianDensityType(lambda_mu.first, lambda_mu.second);
 
-         std::cout << std::fabs(p->mode()-mode) << std::endl;
-
-         if(std::fabs(p->variance()-variance)>1e-8){
-             //std::cout << "[failed] with an error of variance of " << std::fabs(p->variance()-variance) << std::endl;
-             //return;
+             if(std::fabs(p->variance()-variance)>1e-10){
+                 std::cout << "[failed] with an error of variance of " << std::fabs(p->variance()-variance) << std::endl;
+                 return;
+             }
+             else if(std::fabs(p->mode()-mode)>1e-10){
+                 std::cout << "[failed] with an error of mode of " << std::fabs(p->mode()-mode) << std::endl;
+                 return;
+             }
+             delete p;
          }
-         else if(std::fabs(p->mode()-mode)>1e-8){
-             //std::cout << "[failed] with an error of mode of " << std::fabs(p->mode()-mode) << std::endl;
-             //return;
-         }
-         else{
-             std::cout << "passed" << std::endl;
-         }
-         delete p;
-         break;
      }
      std::cout << "[passed]" << std::endl;
 }
@@ -86,7 +92,8 @@ int main (int argc, char *argv[]){
     std::cout << "Gaussian process regression with different inversion methods: " << std::endl;
     try{
         Test1();
-        Test2();
+        Test2(false);
+        Test2(true);
 
     }
     catch(std::string& s){
