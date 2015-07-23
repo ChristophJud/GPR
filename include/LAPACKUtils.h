@@ -35,20 +35,26 @@ int get_optimal_block_size(int N){
     return ilaenv_(&ispec, name, space, &N, &n, &n, &n);
 }
 
-void lu_inversion(double* A, int N)
+int lu_inversion(double* A, int N)
 {
     int *IPIV = new int[N];
     //int LWORK = N*N;
     int LWORK = N*get_optimal_block_size(N);
     double *WORK = new double[LWORK];
-    int INFO;
+    int INFO=0;
 
     dgetrf_(&N,&N,A,&N,IPIV,&INFO);
+    if(INFO!=0) return INFO;
+
     dgetri_(&N,A,&N,IPIV,WORK,&LWORK,&INFO);
+    if(INFO!=0) return INFO;
 
     delete[] IPIV;
     delete[] WORK;
+
+    return INFO;
 }
+
 
 void chol_inversion(double* A, int N)
 {
@@ -81,7 +87,8 @@ typename GaussianProcess<T>::MatrixType lu_invert(const typename GaussianProcess
     GaussianProcess<double>::MatrixType inv_matrix(matrix.template cast<double>());
 
 #ifndef NO_LAPACK_FLAG
-    lapack::lu_inversion(inv_matrix.data(), matrix.cols());
+    int info = lapack::lu_inversion(inv_matrix.data(), inv_matrix.cols());
+    if(info!=0) throw LAPACKException("lu_invert: error in inversion. Matrix is singular or contains an illegal value.");
 #else
     throw LAPACKException("lu_invert: lapack library not linked.");
 #endif

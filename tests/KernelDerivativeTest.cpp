@@ -283,8 +283,8 @@ void Test4(){
     unsigned counter = 0;
 
     for(double scale=0.1; scale<3; scale+=0.8){
-        for(double b=0; b<5*M_PI; b+=0.3){
-            for(double sigma=0.1; sigma<6; sigma+=0.6){
+        for(double b=0.1; b<5*M_PI; b+=0.3){
+            for(double sigma=0.1; sigma<4; sigma+=0.1){
                 // analytical derivative
                 KernelTypePointer k(new KernelType(scale, b, sigma));
                 VectorType D = k->GetDerivative(x,y);
@@ -351,7 +351,7 @@ void Test5(){
     for(double gscale=0.1; gscale<5; gscale+=0.8){
         for(double gsigma=0.1; gsigma<6; gsigma+=0.4){
             for(double pscale=0.1; pscale<4; pscale+=0.8){
-                for(double b=0; b<5*M_PI; b+=0.4){
+                for(double b=0.1; b<5*M_PI; b+=0.4){
                     for(double psigma=0.2; psigma<6; psigma+=0.3){
 
                         // analytical derivative
@@ -454,7 +454,7 @@ void Test6(){
     for(double gscale=0.4; gscale<4; gscale+=0.8){
         for(double gsigma=0.1; gsigma<5; gsigma+=0.4){
             for(double pscale=0.1; pscale<4; pscale+=0.8){
-                for(double b=0; b<4*M_PI; b+=0.4){
+                for(double b=0.1; b<4*M_PI; b+=0.4){
                     for(double psigma=0.4; psigma<5; psigma+=0.3){
 
                         // analytical derivative

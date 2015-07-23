@@ -110,7 +110,9 @@ public:
         m_Kernel = kernel;
 	}
 
-    virtual ~GaussianProcess() {}
+    virtual ~GaussianProcess() {
+        if(debug) std::cout << "GaussianProcess::~GaussianProcess() destruct object" << std::endl;
+    }
 
     const KernelTypePointer GetKernel() { return m_Kernel; }
     void SetKernel(KernelTypePointer k) {

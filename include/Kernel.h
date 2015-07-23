@@ -1000,6 +1000,9 @@ protected:
                               TScalarType& scale2,
                               TScalarType& sigma2,
                               TScalarType& sigma3){
+        if(scale==0) throw std::string("PeriodicKernel: scale parameter has to be positive.");
+        if(b==0) throw std::string("PeriodicKernel: period length parameter has to be positive.");
+        if(sigma==0) throw std::string("PeriodicKernel: sigma parameter has to be positive.");
         scale = parameters[0];
         b = parameters[1];
         sigma = parameters[2];

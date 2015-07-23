@@ -365,12 +365,12 @@ void Test3(){
 int main (int argc, char *argv[]){
     //std::cout << "Maximum likelihood test 2: " << std::endl;
     try{
-        //Test1();
-        //Test2();
-        Test3();
+        Test1();
+        Test2();
+//        Test3();
     }
     catch(std::string& s){
-        std::cout << "Error: " << s << std::endl;
+        std::cout << "[failed] Error: " << s << std::endl;
     }
 
     return 0;

@@ -21,6 +21,7 @@
 
 #include "GaussianProcess.h"
 #include "Kernel.h"
+#include "LAPACKUtils.h"
 
 using namespace gpr;
 
@@ -143,16 +144,48 @@ void Test4(){
     }
 }
 
+void Test5(){
+    std::cout << "Test 5: compare Eigen and Lapack inversion..." << std::flush;
+    double err_lu = 0;
+    double err_chol = 0;
+    unsigned cnt = 0;
+    for(unsigned i=0; i<20; i++){
+        MatrixType M = MatrixType::Random(200,200);
+        MatrixType MM = M*M.adjoint();
+        MatrixType M_inv = M.inverse();
+        MatrixType MM_inv = MM.inverse();
+        MatrixType M_inv_lu = lapack::lu_invert<double>(M);
+        MatrixType MM_inv_chol = lapack::chol_invert<double>(MM);
+
+        err_lu += (M_inv - M_inv_lu).norm();
+        err_chol += (MM_inv - MM_inv_chol).norm();
+
+        cnt++;
+    }
+
+    if(err_lu/cnt > 1e-10){
+        std::cout << " (LU) [failed] with an error of " << err_lu/cnt << std::endl;
+        return;
+    }
+    if(err_chol/cnt > 1e-4){
+        std::cout << " (cholesky) [failed] with an error of " << err_chol/cnt << std::endl;
+        return;
+    }
+    std::cout << "[passed]" << std::endl;
+}
+
+
 int main (int argc, char *argv[]){
     std::cout << "Gaussian process regression with different inversion methods: " << std::endl;
     try{
-    Test1();
-    Test2();
-    Test3();
-    Test4();
+        Test1();
+        Test2();
+        Test3();
+        Test4();
+        Test5();
     }
     catch(std::string& s){
-        std::cout << "Error: " << s << std::endl;
+        std::cout << "[failed] Error: " << s << std::endl;
     }
 
     return 0;

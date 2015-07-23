@@ -374,6 +374,7 @@ void GaussianProcess<TScalarType>::ComputeKernelMatrix(typename GaussianProcess<
 template< class TScalarType >
 void GaussianProcess<TScalarType>::AddNoiseToKernelMatrix(typename GaussianProcess<TScalarType>::MatrixType &M) const{
     // add noise variance to diagonal
+    if(M.rows() != M.cols()) throw std::string("GaussianProcess::AddNoiseToKernelMatrix: square matrix required.");
     for(unsigned i=0; i<M.rows(); i++){
         M(i,i) += m_Sigma*m_Sigma;
     }
@@ -392,6 +393,11 @@ void GaussianProcess<TScalarType>::ComputeKernelMatrixInternal(typename Gaussian
             M(i,j) = v;
             M(j,i) = v;
         }
+    }
+
+    // check if matrix entries are finite
+    if(!((M - M).array() == (M - M).array()).all()){
+        throw std::string("GaussianProcess::ComputeKernelMatrixInternal: kernel matrix contains entries which are not finite.");
     }
 }
 
@@ -495,7 +501,6 @@ void GaussianProcess<TScalarType>::ComputeCoreMatrix(typename GaussianProcess<TS
 
     // add noise variance to diagonal
     AddNoiseToKernelMatrix(K);
-
 
     C = InvertKernelMatrix(K, m_InvMethod);
 

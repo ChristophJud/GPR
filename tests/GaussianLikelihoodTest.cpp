@@ -286,7 +286,7 @@ void Test3(){
     double scale = 400;
     double likelihood_max = std::numeric_limits<double>::lowest();
     double period_max = 0;
-    for(double period=0; period<2*M_PI; period+=0.01){
+    for(double period=0.1; period<2*M_PI; period+=0.01){
         // analytical
         try{
             PeriodicKernelTypePointer gk(new PeriodicKernelType(scale, period, sigma));

@@ -272,7 +272,6 @@ public:
         }
         VectorType delta = VectorType::Zero(num_params);
 
-
         for(unsigned p=0; p<num_params; p++){
             delta[p] = 0.5 * ((alpha*alpha.adjoint() - C) * D.block(p*D.cols(),0,D.cols(),D.cols())).trace();
         }

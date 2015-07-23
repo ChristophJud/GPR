@@ -171,9 +171,15 @@ void Test3(){
 
 int main (int argc, char *argv[]){
     std::cout << "Periodic kernel test: " << std::endl;
-    Test1();
-    Test2();
-    Test3();
+    try{
+        Test1();
+        Test2();
+        Test3();
+    }
+    catch(std::string& s){
+        std::cout << "[failed] Error: " << s << std::endl;
+    }
+
 
     return 0;
 }

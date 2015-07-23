@@ -345,13 +345,19 @@ void Test7(){
 
 int main (int argc, char *argv[]){
     std::cout << "Gaussian process regression test: " << std::endl;
-    Test1();
-    Test2();
-    Test3();
-    Test4();
-    Test5();
-    Test6();
-    Test7();
+    try{
+        Test1();
+        Test2();
+        Test3();
+        Test4();
+        Test5();
+        Test6();
+        Test7();
+    }
+    catch(std::string& s){
+        std::cout << "[failed] Error: " << s << std::endl;
+    }
+
 
 	return 0;
 }
