@@ -106,7 +106,7 @@ void Test1(){
 
     double err = (y-y_predict).norm();
     if(err>0.4){
-        std::cout << " [failed]." << std::endl;
+        std::stringstream ss; ss<<err; throw ss.str();
     }
     else{
         std::cout << " [passed]." << std::endl;
@@ -149,7 +149,7 @@ void Test2(){
         std::cout << " [passed]." << std::endl;
     }
     else{
-        std::cout << " [failed]." << std::endl;
+        throw std::string("gps are not equal");
     }
 }
 
@@ -162,7 +162,7 @@ void Test3(){
     k2->SetParameters(k->GetParameters());
 
     if((*k) != (*k2)){
-        std::cout << " [failed]." << std::endl;
+        throw std::string("kernels are not equal");
     }
     else{
         std::cout << " [passed]." << std::endl;
@@ -178,6 +178,7 @@ int main (int argc, char *argv[]){
     }
     catch(std::string& s){
         std::cout << "[failed] Error: " << s << std::endl;
+        return -1;
     }
 
 

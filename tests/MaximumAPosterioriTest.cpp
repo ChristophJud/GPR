@@ -200,7 +200,7 @@ void Test1(){
         std::cout << "[passed]" << std::endl;
     }
     else{
-        std::cout << "[failed] with an error of " << err/prediction_x.size() << std::endl;
+        std::stringstream ss; ss<<err/prediction_x.size(); throw ss.str();
     }
 }
 
@@ -338,7 +338,7 @@ void Test2(){
         std::cout << "[passed]" << std::endl;
     }
     else{
-        std::cout << "[failed] with an error of " << err/prediction_x.size() << std::endl;
+        std::stringstream ss; ss<<err/prediction_x.size(); throw ss.str();
     }
 }
 
@@ -488,7 +488,7 @@ void Test3(){
         std::cout << "[passed]" << std::endl;
     }
     else{
-        std::cout << "[failed] with an error of " << err/prediction_x.size() << std::endl;
+        std::stringstream ss; ss<<err/prediction_x.size(); throw ss.str();
     }
 }
 
@@ -500,7 +500,8 @@ int main (int argc, char *argv[]){
         Test3();
     }
     catch(std::string& s){
-        std::cout << "Error: " << s << std::endl;
+        std::cout << "[failed] Error: " << s << std::endl;
+        return -1;
     }
 
     return 0;

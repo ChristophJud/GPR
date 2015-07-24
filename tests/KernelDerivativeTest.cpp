@@ -87,7 +87,7 @@ void Test1(){
         std::cout << "\t[passed]." << std::endl;
     }
     else{
-        std::cout << "\t[failed] with an error (sigma) " << err[0]/counter << " and (scale) " << err[1]/counter << std::endl;
+        std::stringstream ss; ss<<"(sigma) " << err[0]/counter << " and (scale) " << err[1]/counter; throw ss.str();
     }
     return;
 
@@ -143,7 +143,7 @@ void Test1_2(){
         std::cout << "\t[passed]." << std::endl;
     }
     else{
-        std::cout << "\t[failed] with an error (sigma) " << err[0]/counter << " and (scale) " << err[1]/counter << std::endl;
+        std::stringstream ss; ss<<"(sigma) " << err[0]/counter << " and (scale) " << err[1]/counter; throw ss.str();
     }
     return;
 }
@@ -193,7 +193,7 @@ void Test2(){
         std::cout << "\t[passed]." << std::endl;
     }
     else{
-        std::cout << "\t[failed]." << std::endl;
+        std::stringstream ss; ss<<"scale 1: " << err1[0]/counter << ", scale 2: "<<err2[0]/counter; throw ss.str();
     }
 }
 
@@ -257,7 +257,7 @@ void Test3(){
         std::cout << "\t\t[passed]." << std::endl;
     }
     else{
-        std::cout << "\t\t[failed]." << std::endl;
+        std::stringstream ss; ss<<"scale: " << err[0]/counter << ", sigma: "<<err[1]/counter << ", alpha: "<<err[2]/counter; throw ss.str();
     }
 }
 
@@ -319,7 +319,7 @@ void Test4(){
         std::cout << "\t[passed]." << std::endl;
     }
     else{
-        std::cout << "\t[failed]." << std::endl;
+        std::stringstream ss; ss<<"scale: "<<err[0]/counter << ", b: "<<err[1]/counter << ", sigma: "<<err[2]/counter; throw ss.str();
     }
 }
 
@@ -422,7 +422,9 @@ void Test5(){
         std::cout << "\t[passed]." << std::endl;
     }
     else{
-        std::cout << "\t[failed]." << std::endl;
+        std::stringstream ss; ss<<"gsigma: "<<err[0]/counter << ", gscale: "<<err[1]/counter;
+        ss<<", pscale: " << err[2]/counter << ", pb: " << err[3]/counter << ", psigma: " << err[4]/counter;
+        throw ss.str();
     }
 }
 
@@ -525,7 +527,9 @@ void Test6(){
         std::cout << "\t[passed]." << std::endl;
     }
     else{
-        std::cout << "\t[failed]." << std::endl;
+        std::stringstream ss; ss<<"gsigma: "<<err[0]/counter << ", gscale: "<<err[1]/counter;
+        ss<<", pscale: " << err[2]/counter << ", pb: " << err[3]/counter << ", psigma: " << err[4]/counter;
+        throw ss.str();
     }
 }
 
@@ -541,7 +545,8 @@ int main (int argc, char *argv[]){
         Test6();
     }
     catch(std::string& s){
-        std::cout << "Error: " << s << std::endl;
+        std::cout << "[failed] Error: " << s << std::endl;
+        return -1;
     }
 
     return 0;

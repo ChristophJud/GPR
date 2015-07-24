@@ -43,7 +43,7 @@ void Test1(){
         std::cout << "[failed] with an error of mode of " << std::fabs(p->mode()-mode) << std::endl;
     }
     else if(std::fabs(p->variance()-variance) > 1e-8){
-        std::cout << "[failed] with an error of variance of " << std::fabs(p->variance()-variance) << std::endl;
+        std::stringstream ss; ss<<"with an error of variance of " << std::fabs(p->variance()-variance); throw ss.str();
     }
     else{
         std::cout << "[passed]" << std::endl;
@@ -75,11 +75,11 @@ void Test2(bool bisection){
              InverseGaussianDensityType* p = new InverseGaussianDensityType(lambda_mu.first, lambda_mu.second);
 
              if(std::fabs(p->variance()-variance)>1e-10){
-                 std::cout << "[failed] with an error of variance of " << std::fabs(p->variance()-variance) << std::endl;
+                 std::stringstream ss; ss<<"with an error of variance of " << std::fabs(p->variance()-variance); throw ss.str();
                  return;
              }
              else if(std::fabs(p->mode()-mode)>1e-10){
-                 std::cout << "[failed] with an error of mode of " << std::fabs(p->mode()-mode) << std::endl;
+                 std::stringstream ss; ss<<"with an error of mode of " << std::fabs(p->mode()-mode); throw ss.str();
                  return;
              }
              delete p;
@@ -97,7 +97,8 @@ int main (int argc, char *argv[]){
 
     }
     catch(std::string& s){
-        std::cout << "Error: " << s << std::endl;
+        std::cout << "[failed] Error: " << s << std::endl;
+        return -1;
     }
 
     return 0;

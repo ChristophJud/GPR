@@ -68,7 +68,7 @@ void Test1(){
 	}
 
     if(err>0.0008){
-        std::cout << " [failed]. Prediction error: " << err << std::endl;
+        std::stringstream ss; ss<<err; throw ss.str();
     }
     else{
         std::cout << " [passed]." << std::endl;
@@ -113,7 +113,7 @@ void Test2(){
 	}
 
     if(err>0.005){
-        std::cout << " [failed]. Prediction error: " << err << std::endl;
+        std::stringstream ss; ss<<err; throw ss.str();
     }
     else{
         std::cout << " [passed]." << std::endl;
@@ -271,7 +271,7 @@ void Test5(){
 	}
 
     if(err>0.6){
-        std::cout << " [failed]. Prediction error: " << err << std::endl;
+        std::stringstream ss; ss<<err; throw ss.str();
     }
     else{
         std::cout << " [passed]." << std::endl;
@@ -340,7 +340,7 @@ void Test7(){
         std::cout << "[passed]" << std::endl;
         return;
     }
-    std::cout << "[failed]" << std::endl;
+    throw std::string("something went wrong");
 }
 
 int main (int argc, char *argv[]){
@@ -356,6 +356,7 @@ int main (int argc, char *argv[]){
     }
     catch(std::string& s){
         std::cout << "[failed] Error: " << s << std::endl;
+        return -1;
     }
 
 

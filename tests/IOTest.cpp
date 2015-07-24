@@ -85,7 +85,7 @@ void Test1(){
         std::cout << "\t\t\t [passed]." << std::endl;
     }
     else{
-        std::cout << "\t\t\t [failed]." << std::endl;
+        std::stringstream ss; ss<<sp_err <<", "<< dp_err; throw ss.str();
     }
 }
 
@@ -124,7 +124,7 @@ void Test2(){
         std::cout << "\t\t\t [passed]." << std::endl;
     }
     else{
-        std::cout << "\t\t\t [failed]." << std::endl;
+        throw std::string("read/write");
     }
 }
 
@@ -176,7 +176,7 @@ void Test3(){
             std::cout << "\t [passed]." << std::endl;
         }
         else{
-            std::cout << "\t [failed]. Prediction error " << (yt-gp_read->Predict(x)).norm() << std::endl;
+            std::stringstream ss; ss<<(yt-gp_read->Predict(x)).norm(); throw ss.str();
         }
     }
 
@@ -190,12 +190,12 @@ void Test3(){
 
         float c = (*gp_read)(x, x); // core matrix should be built
         if(*gp.get() == *gp_read.get()){
-            std::cout << "\t [failed]. Comparison with late core matrix construction not right." << std::endl;
+            throw std::string("Comparison with late core matrix construction not right.");
             return;
         }
         c = (*gp)(x, x); // now the core matrix of gp should be built as well
         if(*gp.get() != *gp_read.get()){
-            std::cout << "\t [failed]. Comparison with late core matrix construction not right." << std::endl;
+            throw std::string("Comparison with late core matrix construction not right.");
             return;
         }
 
@@ -203,7 +203,7 @@ void Test3(){
             std::cout << " \t [passed]." << std::endl;
         }
         else{
-            std::cout << "\t [failed]. Prediction error is " << (yt-gp_read->Predict(x)).norm()  << std::endl;
+            std::stringstream ss; ss<<(yt-gp_read->Predict(x)).norm(); throw ss.str();
         }
     }
 
@@ -221,7 +221,7 @@ void Test3(){
             std::cout << " \t [passed]." << std::endl;
         }
         else{
-            std::cout << "\t [failed]. Prediction error is " << (yt-gp_read->Predict(x)).norm()  << std::endl;
+            std::stringstream ss; ss<<(yt-gp_read->Predict(x)).norm(); throw ss.str();
         }
     }
 }
@@ -229,9 +229,15 @@ void Test3(){
 
 int main (int argc, char *argv[]){
     std::cout << "Input/Output test:" << std::endl;
-    Test1();
-    Test2();
-    Test3();
+    try{
+        Test1();
+        Test2();
+        Test3();
+    }
+    catch(std::string& s){
+        std::cout << "[failed] Error: " << s << std::endl;
+        return -1;
+    }
 
     return 0;
 }

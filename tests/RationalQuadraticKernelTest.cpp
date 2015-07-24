@@ -108,7 +108,7 @@ void Test1(){
 
     double err = (y_predict_gk-y_predict_rq).norm();
     if(err>0.01){
-        std::cout << " [failed]." << std::endl;
+        std::stringstream ss; ss<<err; throw ss.str();
     }
     else{
         std::cout << " [passed]." << std::endl;
@@ -180,7 +180,7 @@ void Test2(){
 
     double err = (y-y_predict_rq).norm();
     if(err>3){
-        std::cout << " [failed]." << std::endl;
+        std::stringstream ss; ss<<err; throw ss.str();
     }
     else{
         std::cout << " [passed]." << std::endl;
@@ -197,7 +197,7 @@ void Test3(){
     k2->SetParameters(k->GetParameters());
 
     if((*k) != (*k2)){
-        std::cout << " [failed]." << std::endl;
+        throw std::string("kernels are not equal");
     }
     else{
         std::cout << " [passed]." << std::endl;
@@ -206,9 +206,15 @@ void Test3(){
 
 int main (int argc, char *argv[]){
     std::cout << "Rational quadratic kernel test: " << std::endl;
-    Test1();
-    Test2();
-    Test3();
+    try{
+    	Test1();
+    	Test2();
+    	Test3();
+    }
+    catch(std::string& s){
+        std::cout << "[failed] Error: " << s << std::endl;
+        return -1;
+    }
 
     return 0;
 }

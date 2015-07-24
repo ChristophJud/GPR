@@ -115,7 +115,7 @@ void Test1(){
 
     double err = (y-y_predict).norm(); // here we are not interested in an accurate regression
     if(err>6){
-        std::cout << "\t[failed]." << std::endl;
+        std::stringstream ss; ss<<err; throw ss.str();
     }
     else{
         std::cout << "\t[passed]." << std::endl;
@@ -144,7 +144,7 @@ void Test1(){
         std::cout << "\t\t\t[passed]." << std::endl;
     }
     else{
-        std::cout << "\t\t\t[failed]." << std::endl;
+        throw std::string("comparison");
     }
 }
 
@@ -153,7 +153,13 @@ void Test1(){
 
 int main (int argc, char *argv[]){
     std::cout << "Highly general kernel test: " << std::endl;
-    Test1();
+    try{
+        Test1();
+    }
+    catch(std::string& s){
+        std::cout << "[failed] Error: " << s << std::endl;
+        return -1;
+    }
 
     return 0;
 }

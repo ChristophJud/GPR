@@ -78,7 +78,7 @@ void Test1(){
     gp->Initialize();
     double err = EvaluateGaussianProcess(gp);
     if(err>0.0006){
-        std::cout << " [failed]. Prediction error: " << err << std::endl;
+        std::stringstream ss; ss<<err; throw ss.str();
     }
     else{
         std::cout << " [passed]." << std::endl;
@@ -96,7 +96,7 @@ void Test2(){
     gp->Initialize();
     double err = EvaluateGaussianProcess(gp);
     if(err>0.0006){
-        std::cout << " [failed]. Prediction error: " << err << std::endl;
+        std::stringstream ss; ss<<err; throw ss.str();
     }
     else{
         std::cout << " [passed]." << std::endl;
@@ -115,14 +115,14 @@ void Test3(){
         gp->Initialize();
         double err = EvaluateGaussianProcess(gp);
         if(err>0.0006){
-            std::cout << " [failed]. Prediction error: " << err << std::endl;
+            std::stringstream ss; ss<<err; throw ss.str();
         }
         else{
             std::cout << " [passed]." << std::endl;
         }
     }
     catch(std::string& s){
-        std::cout << " [failed]. Because: " << s << std::endl;
+        std::cout << "BDCSVD not present in current Eigen version" << std::endl;
     }
 }
 
@@ -137,7 +137,7 @@ void Test4(){
     gp->Initialize();
     double err = EvaluateGaussianProcess(gp);
     if(err>0.0006){
-        std::cout << "[failed]. Prediction error: " << err << std::endl;
+        std::stringstream ss; ss<<err; throw ss.str();
     }
     else{
         std::cout << "[passed]." << std::endl;
@@ -164,11 +164,11 @@ void Test5(){
     }
 
     if(err_lu/cnt > 1e-10){
-        std::cout << " (LU) [failed] with an error of " << err_lu/cnt << std::endl;
+        std::stringstream ss; ss<< " (LU) [failed] with an error of " << err_lu/cnt; throw ss.str();
         return;
     }
     if(err_chol/cnt > 1e-4){
-        std::cout << " (cholesky) [failed] with an error of " << err_chol/cnt << std::endl;
+        std::stringstream ss; ss<<" (cholesky) [failed] with an error of " << err_chol/cnt; throw ss.str();
         return;
     }
     std::cout << "[passed]" << std::endl;
@@ -186,6 +186,7 @@ int main (int argc, char *argv[]){
     }
     catch(std::string& s){
         std::cout << "[failed] Error: " << s << std::endl;
+        return -1;
     }
 
     return 0;

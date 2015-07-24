@@ -111,7 +111,7 @@ void Test1(){
 
     T err = (y-y_predict).norm();
     if(err>3.3){
-        std::cout << " [failed]." << std::endl;
+        std::stringstream ss; ss<<err; throw ss.str();
     }
     else{
         std::cout << " [passed]." << std::endl;
@@ -130,7 +130,7 @@ void Test1(){
         std::cout << " [passed]." << std::endl;
     }
     else{
-        std::cout << " [failed]." << std::endl;
+        throw std::string("GPs are not equal");
     }
 }
 
@@ -161,7 +161,7 @@ void Test2(){
     sk2->SetParameters(sk->GetParameters());
 
     if((*sk) != (*sk2)){
-        std::cout << " [failed]." << std::endl;
+        throw std::string("Kernels are not equal");
     }
     else{
         std::cout << " [passed]." << std::endl;
@@ -178,7 +178,8 @@ int main (int argc, char *argv[]){
     Test2<double>();
     }
     catch(std::string& s){
-        std::cout << "Error: " << s << std::endl;
+        std::cout << "[failed] Error: " << s << std::endl;
+        return -1;
     }
 
     return 0;

@@ -119,7 +119,10 @@ void Test2(unsigned N, bool cout=false){
         }
     }
 
-    m = m*m.transpose(); // make it inverse and positive definite
+    m = m.transpose()*m; // make it inverse and positive definite
+    for(unsigned i=0; i<N; i++){
+        m(i,i) += 0.01;
+    }
 
     if(cout){
         std::cout << "matrix: " << std::endl;
@@ -135,7 +138,7 @@ void Test2(unsigned N, bool cout=false){
     VectorType eigenValues = es.eigenvalues().reverse();
     MatrixType eigenVectors = es.eigenvectors().rowwise().reverse();
     if((eigenValues.real().array() < 0).any()){
-        std::cout << "[failed]: there are negative eigenvalues." << std::endl;
+        throw std::string("there are negative eigenvalues.");
         std::cout.flush();
     }
     MatrixType m_inv = eigenVectors * VectorType(1/eigenValues.array()).asDiagonal() * eigenVectors.transpose();
@@ -174,8 +177,8 @@ int main (int argc, char *argv[]){
     bool cout = false;
     try{
         std::cout << "LAPACK inversion test: (float)" << std::endl;
-        Test1<float>(n, cout);
-        Test2<float>(n, cout);
+        Test1<float>(n/4, cout);
+        Test2<float>(n/4, cout);
 
         std::cout << "LAPACK inversion test: (double)" << std::endl;
         Test1<double>(n, cout);
@@ -183,6 +186,7 @@ int main (int argc, char *argv[]){
     }
     catch(std::string& s){
         std::cout << " [failed] - " << s << std::endl;
+        return -1;
     }
 
 

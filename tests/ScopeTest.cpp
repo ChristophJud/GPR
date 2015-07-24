@@ -126,7 +126,7 @@ void Test1(){
 
     double err = (y-y_predict).norm();
     if(err>3){
-        std::cout << " [failed]." << std::endl;
+        std::stringstream ss; ss<<err; throw ss.str();
     }
     else{
         std::cout << " [passed]." << std::endl;
@@ -140,7 +140,8 @@ int main (int argc, char *argv[]){
         Test1();
     }
     catch(std::string& s){
-        std::cout << "Error: " << s << std::endl;
+        std::cout << "[failed] Error: " << s << std::endl;
+        return -1;
     }
 
     return 0;

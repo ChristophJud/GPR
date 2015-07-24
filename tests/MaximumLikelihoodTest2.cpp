@@ -105,7 +105,7 @@ void Test1(){
 
 
     if(error/gt_n > 2){
-        std::cout << "[failed] with an avg error of " << error/gt_n << std::endl;
+        std::stringstream ss; ss<<error/gt_n; throw ss.str();
     }
     else{
         std::cout << "[passed]" << std::endl;
@@ -211,7 +211,7 @@ void Test2(){
 
 
     if(dense_error < sparse_error){
-        std::cout << "[failed]" << std::endl;
+        throw std::string("dense gp should result in a smaller error than the sparse gp");
     }
     else{
         std::cout << "[passed]" << std::endl;
@@ -371,6 +371,7 @@ int main (int argc, char *argv[]){
     }
     catch(std::string& s){
         std::cout << "[failed] Error: " << s << std::endl;
+        return -1;
     }
 
     return 0;

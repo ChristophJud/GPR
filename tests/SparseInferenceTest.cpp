@@ -114,7 +114,7 @@ void Test1(){
         std::cout << "[passed]" << std::endl;
     }
     else{
-        std::cout << "[failed], with an error of " << inv_error << std::endl;
+        std::stringstream ss; ss<<inv_error; throw ss.str();
     }
 
     std::cout << "Test 1.2 efficient determinant: ... " << std::flush;
@@ -127,7 +127,7 @@ void Test1(){
         std::cout << "[passed]" << std::endl;
     }
     else{
-        std::cout << "[failed]" << std::endl;
+        std::stringstream ss; ss<<det_err; throw ss.str();
     }
 
 }
@@ -210,7 +210,7 @@ void Test2(double jitter){
         std::cout << "[passed]" << std::endl;
     }
     else{
-        std::cout << "[failed] with an error of " << err << std::endl;
+        std::stringstream ss; ss<<err; throw ss.str();
     }
 
 
@@ -219,7 +219,7 @@ void Test2(double jitter){
         std::cout << "[passed]" << std::endl;
     }
     else{
-        std::cout << "[failed]" << std::endl;
+        throw std::string("error in calculating kernel matrix trace.");
     }
 }
 
@@ -331,7 +331,7 @@ void Test3(){
         std::cout << "[passed]" << std::endl;
     }
     else{
-        std::cout << "[failed]" << std::endl;
+        throw std::string("errors in central differences calculation");
     }
 
     return;
@@ -490,7 +490,8 @@ int main (int argc, char *argv[]){
         Test4();
     }
     catch(std::string& s){
-        std::cout << "Error: " << s << std::endl;
+        std::cout << "[failed] Error: " << s << std::endl;
+        return -1;
     }
 
     return 0;

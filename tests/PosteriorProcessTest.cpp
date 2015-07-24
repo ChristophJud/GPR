@@ -82,12 +82,12 @@ void Test1(){
         try{
             double c = 2*std::sqrt((*gp)(x,x)) - gp->GetCredibleInterval(x);
             if(c != 0){
-                std::cout << " [failed] credible interval not correct." << std::endl;
+                throw std::string("credible interval not correct.");
                 return;
             }
         }
         catch(std::string& s){
-            std::cout << " [failed] error in calculating credible interval." << std::endl;
+            throw std::string("error in calculating credible interval.");
             return;
         }
     }
@@ -143,7 +143,7 @@ void Test2(){
     MatrixType Q = rot*scl.asDiagonal();
     double err = (Q*Q.transpose() - K).norm();
     if(err > 1e-8 || std::isnan(err)){
-        std::cout << " [failed] eigen decomposition not accurate enough. (error: " << err << ")" << std::endl;
+        std::stringstream ss; ss<<"eigen decomposition not accurate enough. (error: " << err << ")"; throw ss.str();
         return;
     }
 
@@ -156,7 +156,7 @@ void Test2(){
                 std::fabs(r[20] - mean[20]) > 1e-9 ||
                 std::fabs(r[30] - mean[30]) > 1e-9 ||
                 std::fabs(r[40] - mean[40]) > 1e-9){
-            std::cout << " [failed] samples do not corresponds to the landmarks." << std::endl;
+            throw std::string("samples do not corresponds to the landmarks.");
             return;
         }
     }
@@ -167,9 +167,14 @@ void Test2(){
 
 int main (int argc, char *argv[]){
     std::cout << "Gaussian process posterior test: " << std::endl;
-    Test1();
-    Test2();
-
+    try{
+        Test1();
+        Test2();
+    }
+    catch(std::string& s){
+        std::cout << "[failed] Error: " << s << std::endl;
+        return -1;
+    }
     return 0;
 }
 
