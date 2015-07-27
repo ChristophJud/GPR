@@ -37,6 +37,10 @@ public:
     typedef SparseLikelihood Self;
     typedef std::shared_ptr<Self> Pointer;
 
+    typedef Likelihood<TScalarType> Superclass;
+    typedef typename Superclass::ValueDerivativePair ValueDerivativePair;
+    typedef typename Superclass::ValueJacobianPair ValueJacobianPair;
+
     typedef SparseGaussianProcess<TScalarType> SparseGaussianProcessType;
     typedef typename SparseGaussianProcessType::Pointer SparseGaussianProcessTypePointer;
     typedef typename SparseGaussianProcessType::VectorType VectorType;
@@ -117,6 +121,8 @@ public:
     typedef typename Superclass::SparseGaussianProcessType SparseGaussianProcessType;
     typedef typename Superclass::SparseGaussianProcessTypePointer SparseGaussianProcessTypePointer;
     typedef typename Superclass::GaussianProcessTypePointer GaussianProcessTypePointer;
+    typedef typename Superclass::ValueDerivativePair ValueDerivativePair;
+    typedef typename Superclass::ValueJacobianPair ValueJacobianPair;
 
     typedef long double HighPrecisionType;
 
@@ -278,7 +284,7 @@ public:
         return dt + ct;
     }
 
-    virtual inline std::pair<VectorType, VectorType> GetValueAndParameterDerivatives(const GaussianProcessTypePointer gp) const{
+    virtual inline ValueDerivativePair GetValueAndParameterDerivatives(const GaussianProcessTypePointer gp) const{
         SparseGaussianProcessTypePointer sgp = CastToSparseGaussianProcess(gp);
         if(sgp->GetNumberOfInducingSamples() == 0) throw std::string("SparseLikelihood::GetValueAndParameterDerivative: there are no inducing samples specified");
 
@@ -400,6 +406,132 @@ public:
         //std::cout << "df: " << df_grad.adjoint() << ", cp: " << cp_grad.adjoint() << ", " << sr_grad.adjoint() << std::endl;
 
         return std::make_pair(values, derivatives);
+    }
+
+    virtual inline ValueJacobianPair GetValueAndJacobian(const GaussianProcessTypePointer gp) const{
+        SparseGaussianProcessTypePointer sgp = CastToSparseGaussianProcess(gp);
+        if(sgp->GetNumberOfInducingSamples() == 0) throw std::string("SparseLikelihood::GetValueAndParameterDerivative: there are no inducing samples specified");
+
+        //------------------------------------
+        // get all the important matrices
+        MatrixType K;
+        MatrixType K_inv;
+        MatrixType Knm;
+        DiagMatrixType I_sigma;
+
+        this->GetCoreMatrices(sgp, K, K_inv, Knm, I_sigma);
+
+
+//        std::cout << "Kernel matrix: " << std::endl;
+//        std::cout << K << std::endl;
+//        std::cout << "Kernel matrix inverted: " << std::endl;
+//        std::cout << K_inv << std::endl;
+
+        MatrixType Y;
+        this->GetLabelMatrix(sgp, Y);
+
+//        VectorType Knn_d_trace = this->GetDerivativeKernelMatrixTrace(gp);
+
+        MatrixType C_inv;
+        EfficientInversion(sgp, C_inv, I_sigma, K_inv, K, Knm); // inv(I_sigma + Knm inv(Kmm) Kmn)
+
+        //----------------------------------------------------
+        // data fit term
+        VectorType df_value = -0.5 * (Y.adjoint() * C_inv * Y);
+
+        // data fit gradient
+        // compute: -0.5 Y' inv(C) grad(C) inv(C) Y
+        MatrixType Kmm_d;
+        this->GetDerivativeKernelMatrix(sgp, Kmm_d);
+
+        MatrixType Knm_d;
+        this->GetDerivativeKernelVectorMatrix(sgp, Knm_d);
+
+        unsigned num_params = sgp->GetKernel()->GetNumberOfParameters();
+        unsigned n = sgp->GetNumberOfSamples();
+        unsigned m = sgp->GetNumberOfInducingSamples();
+
+        MatrixType A; // grad(C)
+        A.resize(num_params*n, n);
+        for(unsigned p=0; p<num_params; p++){
+            A.block(p*n, 0, n, n) = Knm_d.block(p*n, 0, n, m) * K_inv * Knm.adjoint() -
+                                    Knm * K_inv * Kmm_d.block(p*m, 0, m, m) * K_inv * Knm.adjoint() +
+                                    Knm * K_inv * Knm_d.block(p*n, 0, n, m).adjoint();
+        }
+
+        MatrixType df_jac =  MatrixType::Zero(Y.cols(), num_params);
+        for(unsigned i=0; i<Y.cols(); i++){
+            for(unsigned p=0; p<num_params; p++){
+                VectorType dTheta_i = 0.5*Y.col(i).adjoint()*C_inv*A.block(p*n, 0, n, n)*C_inv*Y.col(i);
+                if(dTheta_i.rows() != 1) throw std::string("SparseLikelihood::GetParameterDerivatives: dimension missmatch in calculating derivative of data fit term");
+                df_jac(i,p) = dTheta_i[0];
+            }
+        }
+
+
+        //----------------------------------------------------
+        // complexity penalty (parameter regularizer)
+        HighPrecisionType determinant = this->EfficientDeterminant(I_sigma, K_inv, K, Knm);
+        HighPrecisionType cp_value;
+
+        if(determinant <= std::numeric_limits<HighPrecisionType>::min() || std::isnan(determinant)){
+            cp_value = -0.5 * std::log(std::numeric_limits<HighPrecisionType>::min());
+        }
+        else if(determinant > std::numeric_limits<HighPrecisionType>::max()){
+            cp_value = -0.5 * std::log(std::numeric_limits<HighPrecisionType>::max());
+        }
+        else{
+            cp_value = -0.5 * std::log(determinant);
+        }
+
+        // complexity penalty derivative
+        VectorType cp_grad =  VectorType::Zero(num_params);
+        for(unsigned p=0; p<num_params; p++){
+            TScalarType dTheta_i = -0.5 * (C_inv * A.block(p*n, 0, n, n)).trace();
+            cp_grad[p] = dTheta_i;
+        }
+
+        //----------------------------------------------------
+        // inducing sample regularization term
+        MatrixType C;
+        this->GetCoreMatrix(sgp, C, K_inv, Knm);
+
+//        TScalarType Knn_trace = this->GetKernelMatrixTrace(gp);
+
+//        TScalarType sr_value = -0.5/gp->GetSigmaSquared() * (Knn_trace - C.trace());
+        //std::cout << "Knn_trace: " << Knn_trace << ", C.trace " << C.trace() << std::endl;
+
+//        // inducing sample reg term derivative
+//        VectorType sr_grad =  VectorType::Zero(num_params);
+//        for(unsigned p=0; p<num_params; p++){
+//            TScalarType dTheta_i = -0.5/gp->GetSigmaSquared() * (Knn_d_trace[p] - A.block(p*n, 0, n, n).trace());
+//            sr_grad[p] = dTheta_i;
+//        }
+
+        //----------------------------------------------------
+        // constant term
+        TScalarType ct_value = -(sgp->GetNumberOfSamples()/2.0) * std::log(2*M_PI);
+
+
+        // full value
+//        VectorType values = df_value.array() + (cp_value + ct_value + sr_value);
+        VectorType values = df_value.array() + (cp_value + ct_value);
+
+//        if(std::isinf(values[0]) || std::isnan(values.sum())){
+//            std::cout << "df: " << df_value << ", cp: " << cp_value << ", ct: " << ct_value << ", det " << determinant << std::endl;
+//        }
+
+        if(std::isnan(values.sum())){
+            throw std::string("SparseLikelihood::GetValueAndParameterDerivative: likelihood value is not a number.");
+        }
+
+        // full gradient
+//        VectorType derivatives = df_grad + cp_grad + sr_grad;
+        MatrixType jacobian = df_jac.colwise() + cp_grad;
+
+        //std::cout << "df: " << df_grad.adjoint() << ", cp: " << cp_grad.adjoint() << ", " << sr_grad.adjoint() << std::endl;
+
+        return std::make_pair(values, jacobian);
     }
 
     SparseGaussianLogLikelihood() : Superclass(){  }
