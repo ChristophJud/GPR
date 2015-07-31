@@ -224,7 +224,7 @@ void Test3(){
     //std::cout << "Test 3: maximum likelihood of periodic signal ..." << std::flush;
 
     // ground truth periodic variable
-    auto f = [](double x)->double { return std::sin(x)*std::cos(2.2*std::sin(x)); };
+    auto f = [](double x)->double { return 3.5*std::sin(1.3*x); };
 
     double start = 0;
     double stop = 5 * 2*M_PI; // full interval
@@ -253,7 +253,7 @@ void Test3(){
     typedef gpr::PeriodicKernel<double>		KernelType;
     typedef KernelType::Pointer KernelTypePointer;
 
-    KernelTypePointer k(new KernelType(1, 0.2, 2)); // scale, period, smoothness
+    KernelTypePointer k(new KernelType(1.5, 0.5, 4)); // scale, period, smoothness
     GaussianProcessType::Pointer gp(new GaussianProcessType(k));
     gp->SetSigma(noise); // noise
 
@@ -273,13 +273,19 @@ void Test3(){
     // maximum likelihood
     // setup likelihood
     double step = 1e-1;
-    unsigned iterations = 200;
+    unsigned iterations = 300;
+    GaussianProcessInferenceType::BooleanVectorType bv;
+    bv.push_back(false);
+    bv.push_back(true);
+    bv.push_back(false);
+
 
     LikelihoodTypePointer lh(new LikelihoodType());
     GaussianProcessInferenceTypePointer gpi(new GaussianProcessInferenceType(lh, gp, step, iterations));
+    gpi->SetParametersToOptimize(bv);
 
     bool exp_output = false;
-    gpi->Optimize(false, exp_output);
+    gpi->Optimize2(true, exp_output);
 
 
     std::cout << "print \"Parameters are: ";
@@ -309,7 +315,7 @@ void Test3(){
     }
 
     double err = (y-y_predict).norm();
-    std::cout << "print \"" << err << "\""<< std::endl;
+    std::cout << "print \"" << err/y.rows() << "\""<< std::endl;
 //    if(err>0.4){
 //        std::cout << " [failed] with an error of " << err << std::endl;
 //    }
@@ -317,7 +323,7 @@ void Test3(){
 //        std::cout << " [passed]." << std::endl;
 //    }
 
-    //return;
+    return;
     std::cout << "import numpy as np" << std::endl;
     std::cout << "import pylab as plt" << std::endl;
 
@@ -365,9 +371,9 @@ void Test3(){
 int main (int argc, char *argv[]){
     //std::cout << "Maximum likelihood test 2: " << std::endl;
     try{
-        Test1();
-        Test2();
-//        Test3();
+//        Test1();
+//        Test2();
+        Test3();
     }
     catch(std::string& s){
         std::cout << "[failed] Error: " << s << std::endl;

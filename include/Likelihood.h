@@ -263,7 +263,6 @@ public:
             throw std::string("GaussianLogLikelihood::GetValueAndParameterDerivatives: likelihood is infinite.");
         }
 
-
         // DERIVATIVE
 
         MatrixType alpha = C*Y;
